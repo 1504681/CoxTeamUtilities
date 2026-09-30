@@ -26,7 +26,7 @@ Overload, Xeric's aid, Revitalisation and Prayer enhance in your inventory and p
 
 When you walk into Olm you get a chat line with whatever you're still short.
 
-Under the rows a grid shows what each party member holds in inventory + private storage, the shared storage, and the total.
+Under the rows a grid shows what each party member holds in inventory + private storage, the shared storage, and the total. `3?` is an inventory whose private storage hasn't been opened yet; `×` is a member without the plugin (the game doesn't show other players' inventories, so there's nothing to know).
 
 The game only sends a storage's contents while its interface is open, so both storages show `?` until someone has opened them in the current raid (a party member's view of the shared storage is used if you haven't opened it yourself). A deposit or withdrawal made as the interface closes doesn't come back from the game either, so the plugin works those out from what left or entered your inventory.
 

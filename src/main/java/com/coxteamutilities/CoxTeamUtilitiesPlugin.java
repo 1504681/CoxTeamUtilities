@@ -780,8 +780,8 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			{
 				claimed.add(claim.encode());
 			}
-			Supplies carried = privateStorage == null ? inventory : inventory.plus(privateStorage);
-			status = new CoxStatusMessage(Role.names(roles), describe(missing), claimed, carried.toArray(),
+			status = new CoxStatusMessage(Role.names(roles), describe(missing), claimed, inventory.toArray(),
+				privateStorage == null ? null : privateStorage.toArray(),
 				sharedStorage == null ? null : sharedStorage.toArray(), iron);
 		}
 		if (resendStatus || !status.sameContent(lastSent))
@@ -1102,7 +1102,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			state.missing.putAll(missing);
 
 			MemberStatus mine = new MemberStatus(EnumSet.copyOf(state.roles), describe(missing),
-				claims.bySlot(), privateStorage == null ? inventory : inventory.plus(privateStorage), sharedStorage, iron);
+				claims.bySlot(), inventory, privateStorage, sharedStorage, iron);
 
 			state.claimed = claims.doses();
 

@@ -93,12 +93,12 @@ public class CoxTeamPanelTest
 		me.self = true;
 		me.status = new MemberStatus(EnumSet.copyOf(state.roles),
 			Arrays.asList("Standard spellbook (Muttadile Entangler)", "Nature runes (Muttadile Entangler)"),
-			new LinkedHashMap<>(), Supplies.of(new int[]{4, 12, 4, 4}), null, false);
+			new LinkedHashMap<>(), Supplies.of(new int[]{4, 12, 4, 4}), null, null, false);
 		PanelState.Member bob = new PanelState.Member();
 		bob.name = "Zezima the 2nd";
 		bob.status = new MemberStatus(EnumSet.of(Role.TIGHTROPE_LURER, Role.TIGHTROPE_TELEGRAB),
-			Collections.emptyList(), new LinkedHashMap<>(), Supplies.of(new int[]{8, 8, 8, 8}),
-			Supplies.of(new int[]{4, 16, 0, 0}), true);
+			Collections.emptyList(), new LinkedHashMap<>(), Supplies.of(new int[]{4, 8, 4, 4}),
+			Supplies.of(new int[]{4, 0, 4, 4}), Supplies.of(new int[]{4, 16, 0, 0}), true);
 		bob.iron = true;
 		PanelState.Member quiet = new PanelState.Member();
 		quiet.name = "No Plugin";

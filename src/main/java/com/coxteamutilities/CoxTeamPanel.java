@@ -334,21 +334,24 @@ class CoxTeamPanel extends PluginPanel
 			me.name = "You";
 			me.self = true;
 			me.status = new MemberStatus(EnumSet.noneOf(Role.class), Collections.emptyList(), Collections.emptyMap(),
-				state.privateStorage == null ? state.inventory : state.inventory.plus(state.privateStorage), null, false);
+				state.inventory, state.privateStorage, null, false);
 			members = Collections.singletonList(me);
 		}
 		for (PanelState.Member member : members)
 		{
 			c.gridy++;
-			Supplies carried = member.status == null ? null : member.status.getCarried();
-			gridRow(c, member.self ? "You" : member.name, member.self ? GOOD : Color.WHITE, potions,
-				potion -> carried == null ? "?" : units.format(carried.doses(potion)),
-				member.self && state.privateStorage == null ? "Your private storage hasn't been opened this raid" : null);
-			if (carried != null)
+			Supplies held = member.status == null ? null : member.status.getHeld();
+			boolean storageUnknown = member.status != null && member.status.getStored() == null;
+			String note = held == null ? "No plugin: the game doesn't show other players' inventories"
+				: storageUnknown ? "Inventory only, " + (member.self ? "your" : "their")
+				+ " private storage hasn't been opened this raid" : null;
+			gridRow(c, member.self ? "You" : member.name, held == null ? MUTED : member.self ? GOOD : Color.WHITE, potions,
+				potion -> held == null ? "\u00d7" : units.format(held.doses(potion)) + (storageUnknown ? "?" : ""), note);
+			if (held != null)
 			{
 				for (Potion potion : potions)
 				{
-					total[potion.ordinal()] += carried.doses(potion);
+					total[potion.ordinal()] += held.doses(potion);
 				}
 			}
 		}
@@ -385,7 +388,7 @@ class CoxTeamPanel extends PluginPanel
 			JLabel value = small(cell.apply(potion), color);
 			value.setHorizontalAlignment(SwingConstants.RIGHT);
 			value.setPreferredSize(new Dimension(30, value.getPreferredSize().height));
-			value.setToolTipText(potion.getDisplayName());
+			value.setToolTipText(tooltip == null ? potion.getDisplayName() : tooltip);
 			storageGrid.add(value, c);
 		}
 	}

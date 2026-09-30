@@ -76,13 +76,15 @@ public class PanelStateTest
 			claims[i] = "TEKTON:OVERLOAD:" + i + ":2:1:TEKTON+VASA";
 		}
 		MemberStatus status = MemberStatus.from(new CoxStatusMessage(
-			Arrays.asList("MUTTADILE_ZGS", "junk"), Arrays.asList(missing), Arrays.asList(claims), new int[]{8, 12}, null, true));
+			Arrays.asList("MUTTADILE_ZGS", "junk"), Arrays.asList(missing), Arrays.asList(claims), new int[]{8, 12}, null, null, true));
 		assertTrue(status.isIron());
 		assertEquals(Collections.singleton(Role.MUTTADILE_ZGS), status.getRoles());
 		assertEquals(MemberStatus.MAX_MISSING, status.getMissing().size());
 		assertEquals(MemberStatus.MAX_TEXT, status.getMissing().get(0).length());
 		assertEquals(DropPlan.MAX_COUNT, status.getClaims().size());
 		assertEquals(12, status.getCarried().doses(Potion.XERICS_AID));
+		assertEquals(12, status.getHeld().doses(Potion.XERICS_AID));
+		assertNull(status.getStored());
 		assertNull(status.getShared());
 	}
 

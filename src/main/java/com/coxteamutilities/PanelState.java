@@ -371,7 +371,7 @@ final class PanelState
 			if (member.status != null)
 			{
 				sb.append(member.status.getRoles()).append(member.status.getMissing())
-					.append(member.status.getCarried());
+					.append(member.status.getHeld());
 			}
 		}
 		return sb.toString();

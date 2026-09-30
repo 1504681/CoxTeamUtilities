@@ -19,19 +19,23 @@ public final class MemberStatus
 	private final Set<Role> roles;
 	private final List<String> missing;
 	private final Map<Slot, Claim> claims;
+	/** inventory only */
 	private final Supplies carried;
-	/** null until they open the shared storage */
+	/** null until they open their private storage */
+	private final Supplies stored;
+	/** null until someone opens the shared storage */
 	private final Supplies shared;
 	private final boolean iron;
 
 	public MemberStatus(Set<Role> roles, List<String> missing, Map<Slot, Claim> claims, Supplies carried,
-		Supplies shared, boolean iron)
+		Supplies stored, Supplies shared, boolean iron)
 	{
 		this.iron = iron;
 		this.roles = roles;
 		this.missing = missing;
 		this.claims = claims;
 		this.carried = carried;
+		this.stored = stored;
 		this.shared = shared;
 	}
 
@@ -61,6 +65,7 @@ public final class MemberStatus
 			}
 		}
 		return new MemberStatus(Role.parse(message.getRoles()), missing, claims, Supplies.of(message.getCarried()),
+			message.getStored() == null ? null : Supplies.of(message.getStored()),
 			message.getShared() == null ? null : Supplies.of(message.getShared()), message.isIron());
 	}
 
@@ -89,8 +94,19 @@ public final class MemberStatus
 		return carried;
 	}
 
+	public Supplies getStored()
+	{
+		return stored;
+	}
+
 	public Supplies getShared()
 	{
 		return shared;
+	}
+
+	/** Inventory plus private storage as far as it is known. */
+	public Supplies getHeld()
+	{
+		return stored == null ? carried : carried.plus(stored);
 	}
 }
