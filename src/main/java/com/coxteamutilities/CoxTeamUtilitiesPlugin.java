@@ -146,9 +146,10 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	private final DropPlan plan = new DropPlan();
 	private volatile ChestBook chests = new ChestBook();
 	/** Names of the item in each inventory slot, null for empty, for the chest plans. */
-	private List<String> inventoryNames = Collections.emptyList();
-	/** The inventory when the storage was opened, so a "put in xN" line knows how many went in. */
-	private List<String> openedWith = Collections.emptyList();
+	/** Item name to quantity in the inventory. */
+	private Map<String, Integer> inventoryItems = Collections.emptyMap();
+	/** The inventory when the storage was opened, so a "put in, N" line knows how many went in. */
+	private Map<String, Integer> openedWith = Collections.emptyMap();
 	/** Key of the chest for the room the player is in, null outside a room with one. */
 	private volatile String currentChest;
 	/** Progress at the chest whose storage is open, for the overlays. */
@@ -356,7 +357,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			openStorage = event.getGroupId();
 			synchronized (lock)
 			{
-				openedWith = inventoryNames;
+				openedWith = inventoryItems;
 			}
 			String key = currentChest;
 			if (key != null && chests.get(key) == null && chests.getOrCreate(key, chestName(key)) != null)
@@ -759,32 +760,32 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			openChest = null;
 			return;
 		}
-		List<String> names;
+		Map<String, Integer> items;
 		synchronized (lock)
 		{
-			names = inventoryNames;
+			items = inventoryItems;
 		}
-		openChest = new ChestProgress(plan, names, openedWith, storageNames());
-	}
-
-	/** Names of what's in the open storage, one per slot. */
-	private List<String> storageNames()
-	{
 		ItemContainer storage = client.getItemContainer(openStorage == InterfaceID.RAIDS_STORAGE_SHARED
 			? InventoryID.RAIDS_SHAREDSTORAGE : InventoryID.RAIDS_PRIVATESTORAGE);
-		if (storage == null)
+		openChest = new ChestProgress(plan, items, openedWith, tally(storage));
+	}
+
+	/** Item name to quantity for a container, empty for one the client hasn't seen. */
+	private Map<String, Integer> tally(ItemContainer container)
+	{
+		if (container == null)
 		{
-			return Collections.emptyList();
+			return Collections.emptyMap();
 		}
-		List<String> names = new ArrayList<>();
-		for (Item item : storage.getItems())
+		Map<String, Integer> items = new LinkedHashMap<>();
+		for (Item item : container.getItems())
 		{
 			if (item.getId() > 0)
 			{
-				names.add(itemName(item.getId()));
+				items.merge(itemName(item.getId()), item.getQuantity(), Integer::sum);
 			}
 		}
-		return names;
+		return items;
 	}
 
 	/** Item name from the cache, filled on the client thread. */
@@ -900,15 +901,11 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		ItemContainer carried = client.getItemContainer(InventoryID.INV);
 		ItemContainer worn = client.getItemContainer(InventoryID.WORN);
 		Supplies carriedSupplies = Supplies.EMPTY;
-		List<String> names = new ArrayList<>();
+		Map<String, Integer> items = tally(carried);
 		if (carried != null)
 		{
 			add(loadout, carried.getItems());
 			carriedSupplies = count(carried.getItems());
-			for (Item item : carried.getItems())
-			{
-				names.add(item.getId() > 0 ? itemName(item.getId()) : null);
-			}
 		}
 		if (worn != null)
 		{
@@ -926,7 +923,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		synchronized (lock)
 		{
 			inventory = carriedSupplies;
-			inventoryNames = names;
+			inventoryItems = items;
 			missing = missingFor(roles, loadout);
 		}
 		updateOpenChest();
@@ -1448,9 +1445,10 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		state.chests = chests.copy(gson);
 		state.currentChest = currentChest;
 		state.marking = marking;
+		state.openChest = openChest;
 		synchronized (lock)
 		{
-			state.inventoryNames = inventoryNames;
+			state.carriedItems = inventoryItems;
 		}
 		state.separateSoloNeeds = config.separateSoloNeeds();
 		state.trackStamina = config.trackStamina();

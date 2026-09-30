@@ -211,45 +211,6 @@ public final class ChestPlan
 		return false;
 	}
 
-	/**
-	 * Lines for an inventory in slot order, as "Name" or "Name, N" for a run of the same thing.
-	 * Dose and charge suffixes are dropped so a line matches any of them.
-	 */
-	public static List<String> fromInventory(List<String> itemNames)
-	{
-		List<String> lines = new ArrayList<>();
-		String last = null;
-		int run = 0;
-		for (String itemName : itemNames)
-		{
-			if (itemName == null)
-			{
-				continue;
-			}
-			String name = baseName(itemName);
-			if (name.equals(last))
-			{
-				run++;
-			}
-			else
-			{
-				flush(lines, last, run);
-				last = name;
-				run = 1;
-			}
-		}
-		flush(lines, last, run);
-		return lines;
-	}
-
-	private static void flush(List<String> lines, String name, int run)
-	{
-		if (name != null && lines.size() < MAX_LINES)
-		{
-			lines.add(run > 1 ? name + ", " + run : name);
-		}
-	}
-
 	/** "Xeric's aid(4)" and "Toxic blowpipe (charged)" become "Xeric's aid" and "Toxic blowpipe". */
 	static String baseName(String itemName)
 	{

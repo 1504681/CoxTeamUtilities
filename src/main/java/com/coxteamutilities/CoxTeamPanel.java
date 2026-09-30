@@ -593,7 +593,8 @@ class CoxTeamPanel extends PluginPanel
 		chestSteps.clear();
 		if (plan.getKey().equals(state.currentChest))
 		{
-			ChestProgress progress = new ChestProgress(plan, state.inventoryNames);
+			ChestProgress progress = state.openChest != null && state.openChest.plan.getKey().equals(plan.getKey())
+				? state.openChest : new ChestProgress(plan, state.carriedItems);
 			ChestProgress.Step next = progress.next();
 			for (ChestProgress.Step step : progress.deposits)
 			{

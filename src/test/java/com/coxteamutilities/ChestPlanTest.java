@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.junit.Test;
 
 public class ChestPlanTest
@@ -52,12 +53,12 @@ public class ChestPlanTest
 	{
 		ChestPlan plan = new ChestPlan("RAIDS_FARMING#1", "Farming 1");
 		plan.getDeposit().add("Endarkened*, 2");
-		List<String> three = Arrays.asList("Endarkened juice", "Endarkened juice", "Endarkened juice");
-		List<String> one = Collections.singletonList("Endarkened juice");
-		List<String> none = Collections.emptyList();
+		Map<String, Integer> three = Collections.singletonMap("Endarkened juice", 3);
+		Map<String, Integer> one = Collections.singletonMap("Endarkened juice", 1);
+		Map<String, Integer> none = Collections.emptyMap();
 		assertFalse(new ChestProgress(plan, three, three, none).deposits.get(0).done);
 		assertTrue(new ChestProgress(plan, one, three, none).deposits.get(0).done);
-		assertTrue(new ChestProgress(plan, three, three, Arrays.asList("Endarkened juice", "Endarkened juice")).deposits.get(0).done);
+		assertTrue(new ChestProgress(plan, three, three, Collections.singletonMap("Endarkened juice", 2)).deposits.get(0).done);
 		assertFalse(new ChestProgress(plan, three, three, one).deposits.get(0).done);
 		// without a number every one of them goes in
 		plan.getDeposit().set(0, "Endarkened*");
@@ -81,14 +82,6 @@ public class ChestPlanTest
 	}
 
 	@Test
-	public void inventoryBecomesLinesInSlotOrder()
-	{
-		List<String> lines = ChestPlan.fromInventory(Arrays.asList(
-			"Elder maul", "Xeric's aid(4)", "Xeric's aid(3)", null, "Toxic blowpipe (charged)", "Xeric's aid(4)"));
-		assertEquals(Arrays.asList("Elder maul", "Xeric's aid, 2", "Toxic blowpipe", "Xeric's aid"), lines);
-	}
-
-	@Test
 	public void typedTextBecomesTrimmedLines()
 	{
 		assertEquals(Arrays.asList("Elder maul", "Overload"), ChestPlan.lines("  Elder maul \n\n Overload\n"));
@@ -103,7 +96,7 @@ public class ChestPlanTest
 		plan.getWithdraw().addAll(Arrays.asList("Xeric's aid, 2", "Stinkhorn mushroom", "Overload"));
 		plan.setOrdered(true);
 
-		ChestProgress before = new ChestProgress(plan, Arrays.asList("Elder maul", "Xeric's aid(4)"));
+		ChestProgress before = new ChestProgress(plan, ChestProgress.tally(Arrays.asList("Elder maul", "Xeric's aid(4)")));
 		assertFalse(before.deposits.get(0).done);
 		assertFalse(before.withdrawals.get(0).done);
 		assertEquals("Xeric's aid, 2", before.next().line.text);
@@ -115,7 +108,7 @@ public class ChestPlanTest
 		assertFalse(before.isDone());
 
 		ChestProgress after = new ChestProgress(plan,
-			Arrays.asList("Xeric's aid(4)", "Xeric's aid(4)", "Stinkhorn mushroom", "Overload(4)"));
+			ChestProgress.tally(Arrays.asList("Xeric's aid(4)", "Xeric's aid(4)", "Stinkhorn mushroom", "Overload(4)")));
 		assertTrue(after.isDone());
 		assertNull(after.next());
 		assertNull(after.highlightsWithdraw("Overload(4)", false));
@@ -126,9 +119,9 @@ public class ChestPlanTest
 	{
 		ChestPlan plan = new ChestPlan("RAIDS_ICE_DEMON#1", "Ice demon");
 		plan.getDeposit().add("everything");
-		assertFalse(new ChestProgress(plan, Collections.singletonList("Bronze dagger")).isDone());
-		assertTrue(new ChestProgress(plan, Collections.emptyList()).isDone());
-		assertTrue(new ChestProgress(plan, Collections.singletonList("Bronze dagger")).highlightsDeposit("Bronze dagger"));
+		assertFalse(new ChestProgress(plan, Collections.singletonMap("Bronze dagger", 1)).isDone());
+		assertTrue(new ChestProgress(plan, Collections.emptyMap()).isDone());
+		assertTrue(new ChestProgress(plan, Collections.singletonMap("Bronze dagger", 1)).highlightsDeposit("Bronze dagger"));
 	}
 
 	@Test
@@ -136,6 +129,6 @@ public class ChestPlanTest
 	{
 		ChestPlan plan = new ChestPlan("k", "n");
 		plan.getWithdraw().add("Overload");
-		assertNull(new ChestProgress(plan, Collections.emptyList()).next());
+		assertNull(new ChestProgress(plan, Collections.emptyMap()).next());
 	}
 }

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -264,7 +265,10 @@ final class PanelState
 	ChestBook chests = new ChestBook();
 	/** Chest of the room the player is in, null outside one. */
 	String currentChest;
-	List<String> inventoryNames = new ArrayList<>();
+	/** Item name to quantity in the inventory, for the steps of a chest that isn't open. */
+	Map<String, Integer> carriedItems = new LinkedHashMap<>();
+	/** Progress at the storage that's open right now, null when none is. */
+	ChestProgress openChest;
 	/** What happened at each chest the last time its storage was open, this session. */
 	/** Whether clicking items in a storage or the inventory adds them to the chest's lists. */
 	boolean marking;

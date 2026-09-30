@@ -123,7 +123,7 @@ public class CoxTeamPanelTest
 		farm.setOrdered(true);
 		state.currentChest = "RAIDS_FARMING#1";
 		state.marking = true;
-		state.inventoryNames = Arrays.asList("Xeric's aid(4)", "Xeric's aid(3)", "Stinkhorn mushroom");
+		state.carriedItems = ChestProgress.tally(Arrays.asList("Xeric's aid(4)", "Xeric's aid(3)", "Stinkhorn mushroom"));
 		state.roles.addAll(EnumSet.of(Role.MUTTADILE_ZGS, Role.MUTTADILE_ENTANGLE, Role.TIGHTROPE_LURER));
 		state.missing.put(Role.MUTTADILE_ENTANGLE, Arrays.asList("Standard spellbook", "Nature runes"));
 
