@@ -19,7 +19,11 @@ public class ChestPlanTest
 		assertTrue(aid.matches("Xeric's aid(4)"));
 		assertTrue(aid.matches("xeric's aid(1)"));
 		assertFalse(aid.matches("Overload(4)"));
-		ChestPlan.Line shrooms = new ChestPlan.Line("Stinkhorn mushroom x3");
+		ChestPlan.Line shrooms = new ChestPlan.Line("Stinkhorn mushroom, 3");
+		ChestPlan.Line old = new ChestPlan.Line("Stinkhorn mushroom x3");
+		assertEquals(3, old.count);
+		assertEquals("Stinkhorn mushroom", old.name);
+		assertEquals("Wilson, sr.", new ChestPlan.Line("Wilson, sr.").name);
 		assertEquals("Stinkhorn mushroom", shrooms.name);
 		assertEquals(3, shrooms.count);
 		ChestPlan.Line axe = new ChestPlan.Line("Dragon axe");
@@ -35,7 +39,7 @@ public class ChestPlanTest
 		assertTrue(chins.matches("Black chinchompa"));
 		assertTrue(chins.matches("Chinchompa"));
 		assertFalse(chins.matches("Chinchompa gloves"));
-		ChestPlan.Line dragon = new ChestPlan.Line("Dragon * x2");
+		ChestPlan.Line dragon = new ChestPlan.Line("Dragon *, 2");
 		assertTrue(dragon.matches("Dragon axe"));
 		assertFalse(dragon.matches("Dragonstone"));
 		assertEquals(2, dragon.count);
@@ -47,7 +51,7 @@ public class ChestPlanTest
 	public void aCountedDepositIsDoneOnceThatManyWentIn()
 	{
 		ChestPlan plan = new ChestPlan("RAIDS_FARMING#1", "Farming 1");
-		plan.getDeposit().add("Endarkened* x2");
+		plan.getDeposit().add("Endarkened*, 2");
 		List<String> three = Arrays.asList("Endarkened juice", "Endarkened juice", "Endarkened juice");
 		List<String> one = Collections.singletonList("Endarkened juice");
 		List<String> none = Collections.emptyList();
@@ -68,7 +72,7 @@ public class ChestPlanTest
 		assertTrue(ChestPlan.mark(lines, "Xeric's aid(4)", 1));
 		assertTrue(ChestPlan.mark(lines, "Xeric's aid(3)", 1));
 		assertTrue(ChestPlan.mark(lines, "Black chinchompa", 1));
-		assertEquals(Arrays.asList("*chinchompa", "Xeric's aid x2", "Black chinchompa"), lines);
+		assertEquals(Arrays.asList("*chinchompa", "Xeric's aid, 2", "Black chinchompa"), lines);
 		assertTrue(ChestPlan.mark(lines, "Xeric's aid(2)", -1));
 		assertTrue(ChestPlan.mark(lines, "Black chinchompa", -1));
 		assertEquals(Arrays.asList("*chinchompa", "Xeric's aid"), lines);
@@ -81,7 +85,7 @@ public class ChestPlanTest
 	{
 		List<String> lines = ChestPlan.fromInventory(Arrays.asList(
 			"Elder maul", "Xeric's aid(4)", "Xeric's aid(3)", null, "Toxic blowpipe (charged)", "Xeric's aid(4)"));
-		assertEquals(Arrays.asList("Elder maul", "Xeric's aid x2", "Toxic blowpipe", "Xeric's aid"), lines);
+		assertEquals(Arrays.asList("Elder maul", "Xeric's aid, 2", "Toxic blowpipe", "Xeric's aid"), lines);
 	}
 
 	@Test
@@ -96,13 +100,13 @@ public class ChestPlanTest
 	{
 		ChestPlan plan = new ChestPlan("RAIDS_FARMING#1", "Farming 1");
 		plan.getDeposit().add("Elder maul");
-		plan.getWithdraw().addAll(Arrays.asList("Xeric's aid x2", "Stinkhorn mushroom", "Overload"));
+		plan.getWithdraw().addAll(Arrays.asList("Xeric's aid, 2", "Stinkhorn mushroom", "Overload"));
 		plan.setOrdered(true);
 
 		ChestProgress before = new ChestProgress(plan, Arrays.asList("Elder maul", "Xeric's aid(4)"));
 		assertFalse(before.deposits.get(0).done);
 		assertFalse(before.withdrawals.get(0).done);
-		assertEquals("Xeric's aid x2", before.next().line.text);
+		assertEquals("Xeric's aid, 2", before.next().line.text);
 		assertTrue(before.highlightsDeposit("Elder maul"));
 		assertFalse(before.highlightsDeposit("Overload(4)"));
 		assertEquals(1, before.highlightsWithdraw("Xeric's aid(3)", true).order);

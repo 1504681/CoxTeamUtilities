@@ -119,7 +119,7 @@ public class CoxTeamPanelTest
 		ice.getDeposit().add("Elder maul");
 		ChestPlan farm = state.chests.getOrCreate("RAIDS_FARMING#1", "Farming 1");
 		farm.getDeposit().add("everything");
-		farm.getWithdraw().addAll(Arrays.asList("Xeric's aid x2", "Stinkhorn mushroom x3", "Noxifer"));
+		farm.getWithdraw().addAll(Arrays.asList("Xeric's aid, 2", "Stinkhorn mushroom, 3", "Noxifer"));
 		farm.setOrdered(true);
 		state.currentChest = "RAIDS_FARMING#1";
 		state.marking = true;

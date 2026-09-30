@@ -37,18 +37,22 @@ public final class ChestPlan
 			int count = 1;
 			boolean counted = false;
 			String name = text;
+			// "Name, 3", or the older "Name x3"
+			int comma = lower.lastIndexOf(',');
 			int x = lower.lastIndexOf(" x");
-			if (x > 0)
+			int cut = comma > 0 ? comma : x;
+			int numberAt = comma > 0 ? comma + 1 : x + 2;
+			if (cut > 0)
 			{
 				try
 				{
-					count = Math.max(1, Integer.parseInt(lower.substring(x + 2).trim()));
-					name = text.substring(0, x).trim();
+					count = Math.max(1, Integer.parseInt(lower.substring(numberAt).trim()));
+					name = text.substring(0, cut).trim();
 					counted = true;
 				}
 				catch (NumberFormatException e)
 				{
-					// "x" was part of the name
+					// the comma or "x" was part of the name
 				}
 			}
 			this.name = name;
@@ -173,7 +177,7 @@ public final class ChestPlan
 	}
 
 	/**
-	 * Adds to or takes from the line for an item, keeping the count in the "Name xN" suffix.
+	 * Adds to or takes from the line for an item, keeping the count in the "Name, N" suffix.
 	 * Only a plain line for the item's base name is touched, never a wildcard; the line is
 	 * added at the end when there is none and dropped when its count reaches zero.
 	 *
@@ -194,21 +198,21 @@ public final class ChestPlan
 				}
 				else
 				{
-					lines.set(i, count > 1 ? name + " x" + count : name);
+					lines.set(i, count > 1 ? name + ", " + count : name);
 				}
 				return true;
 			}
 		}
 		if (delta > 0 && lines.size() < MAX_LINES)
 		{
-			lines.add(delta > 1 ? name + " x" + delta : name);
+			lines.add(delta > 1 ? name + ", " + delta : name);
 			return true;
 		}
 		return false;
 	}
 
 	/**
-	 * Lines for an inventory in slot order, as "Name" or "Name xN" for a run of the same thing.
+	 * Lines for an inventory in slot order, as "Name" or "Name, N" for a run of the same thing.
 	 * Dose and charge suffixes are dropped so a line matches any of them.
 	 */
 	public static List<String> fromInventory(List<String> itemNames)
@@ -242,7 +246,7 @@ public final class ChestPlan
 	{
 		if (name != null && lines.size() < MAX_LINES)
 		{
-			lines.add(run > 1 ? name + " x" + run : name);
+			lines.add(run > 1 ? name + ", " + run : name);
 		}
 	}
 

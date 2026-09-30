@@ -503,7 +503,7 @@ class CoxTeamPanel extends PluginPanel
 		area.setWrapStyleWord(true);
 		area.setMargin(new Insets(3, 3, 3, 3));
 		area.setToolTipText("<html>One item per line, matched from the start of its name, so 'Xeric's aid' is any dose."
-			+ "<br>* and ? are wildcards: '*chinchompa', 'Dragon *'. 'Stinkhorn mushroom x3' for a number"
+			+ "<br>* and ? are wildcards: '*chinchompa', 'Dragon *'. 'Stinkhorn mushroom, 3' for a number"
 			+ (deposit ? ", 'everything' to empty the inventory" : "") + ".</html>");
 		area.addFocusListener(new FocusAdapter()
 		{
