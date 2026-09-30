@@ -20,7 +20,7 @@ If something is missing the role turns red in the sidebar, an overlay lists it a
 
 ## Supplies
 
-Overload, Xeric's aid, Revitalisation and Prayer enhance doses, split into inventory, private storage, shared storage and claimed drops. Set the doses you want by Olm with the number next to each potion and the row shows how many you're short.
+Overload, Xeric's aid, Revitalisation and Prayer enhance doses, split into inventory, private storage, shared storage and claimed drops. The `need` number is the sum of the **Doses needed per room** table underneath: type how many doses you drink at each room (defaults: 4 Overload, 12 Xeric's aid, 8 Revitalisation, 4 Prayer enhance, all at Olm) and the row shows how many you're short. Hover a room name to see what you still have to drink from that room on.
 
 The game only sends storage contents when you open the storage unit, so both storages show `?` until you've opened them in the current raid.
 
@@ -59,7 +59,6 @@ Join a party with the core Party plugin. Each member with this plugin shows up u
 
 | Setting | Default |
 |---|---|
-| Doses needed: Overload / Xeric's aid / Revitalisation / Prayer enhance | 4 / 12 / 8 / 4 |
 | Count claimed drops towards what you need | on |
 | Count shared storage towards what you need | off |
 | Count split overloads as overload doses | on |

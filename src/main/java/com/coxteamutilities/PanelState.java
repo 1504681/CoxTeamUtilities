@@ -257,6 +257,7 @@ final class PanelState
 	Supplies sharedStorage;
 	Supplies claimed = Supplies.EMPTY;
 	final Map<Potion, Integer> need = new EnumMap<>(Potion.class);
+	NeedPlan needs = new NeedPlan();
 
 	final Set<Role> roles = EnumSet.noneOf(Role.class);
 	final Map<Role, List<String>> missing = new EnumMap<>(Role.class);

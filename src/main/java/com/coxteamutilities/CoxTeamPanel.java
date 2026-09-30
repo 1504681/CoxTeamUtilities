@@ -9,6 +9,8 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.awt.Insets;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
@@ -22,8 +24,7 @@ import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
-import javax.swing.JSpinner;
-import javax.swing.SpinnerNumberModel;
+import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.border.EmptyBorder;
 import net.runelite.client.ui.ColorScheme;
@@ -36,7 +37,7 @@ class CoxTeamPanel extends PluginPanel
 	{
 		void setRole(Role role, boolean selected);
 
-		void setNeed(Potion potion, int doses);
+		void setNeed(CmRoom room, Potion potion, int doses);
 
 		void setDropCount(CmRoom room, Potion potion, int count);
 
@@ -111,7 +112,11 @@ class CoxTeamPanel extends PluginPanel
 	private final Map<Potion, JLabel> haveLabels = new EnumMap<>(Potion.class);
 	private final Map<Potion, JLabel> detailLabels = new EnumMap<>(Potion.class);
 	private final Map<Potion, JLabel> moreLabels = new EnumMap<>(Potion.class);
-	private final Map<Potion, JSpinner> needSpinners = new EnumMap<>(Potion.class);
+	private final Map<Potion, JLabel> needLabels = new EnumMap<>(Potion.class);
+	private final Map<CmRoom, Map<Potion, JTextField>> needFields = new EnumMap<>(CmRoom.class);
+	private final Map<CmRoom, JLabel> roomLabels = new EnumMap<>(CmRoom.class);
+	private final JPanel needsBody = new JPanel();
+	private final JLabel needsToggle = small("", MUTED);
 	private final Map<Role, JCheckBox> roleBoxes = new EnumMap<>(Role.class);
 	private final Map<Role, JLabel> roleMissing = new EnumMap<>(Role.class);
 	private final Stack teamBody = new Stack(ColorScheme.DARKER_GRAY_COLOR);
@@ -245,19 +250,14 @@ class CoxTeamPanel extends PluginPanel
 			text.add(detail);
 			text.add(more);
 
-			JSpinner need = new JSpinner(new SpinnerNumberModel(0, 0, 99, 1));
-			need.setPreferredSize(new Dimension(48, 24));
-			need.setToolTipText("Doses of " + potion.getDisplayName() + " you want to have by Olm");
-			need.addChangeListener(e ->
-			{
-				if (!updating)
-				{
-					actions.setNeed(potion, (Integer) need.getValue());
-				}
-			});
-			needSpinners.put(potion, need);
+			JLabel need = new JLabel("0", SwingConstants.CENTER);
+			need.setFont(FontManager.getRunescapeBoldFont());
+			need.setForeground(Color.WHITE);
+			need.setToolTipText("Doses of " + potion.getDisplayName() + " you want over the raid, from the rooms below");
+			needLabels.put(potion, need);
 			JPanel needHolder = new JPanel(new BorderLayout());
 			needHolder.setOpaque(false);
+			needHolder.setPreferredSize(new Dimension(34, 32));
 			needHolder.add(small("need", MUTED), BorderLayout.NORTH);
 			needHolder.add(need, BorderLayout.CENTER);
 
@@ -269,7 +269,110 @@ class CoxTeamPanel extends PluginPanel
 			body.addRow(row, first ? 0 : 6);
 			first = false;
 		}
+		body.addRow(buildNeeds(), 8);
 		return body;
+	}
+
+	/** A row per room with a field per potion, under a header that folds it away. */
+	private JPanel buildNeeds()
+	{
+		JPanel header = new JPanel(new BorderLayout());
+		header.setOpaque(false);
+		JLabel title = small("Doses needed per room", Color.WHITE);
+		header.add(title, BorderLayout.WEST);
+		header.add(needsToggle, BorderLayout.EAST);
+		header.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		header.setToolTipText("What you drink where. The totals are what the rows above compare against.");
+		header.addMouseListener(new MouseAdapter()
+		{
+			@Override
+			public void mousePressed(MouseEvent e)
+			{
+				needsBody.setVisible(!needsBody.isVisible());
+				needsToggle.setText(needsBody.isVisible() ? "hide" : "show");
+				revalidate();
+				repaint();
+			}
+		});
+		needsToggle.setText("hide");
+
+		needsBody.setLayout(new GridBagLayout());
+		needsBody.setOpaque(false);
+		GridBagConstraints c = new GridBagConstraints();
+		c.gridy = 0;
+		c.insets = new Insets(1, 0, 1, 2);
+		c.anchor = GridBagConstraints.WEST;
+		c.fill = GridBagConstraints.HORIZONTAL;
+		c.gridx = 0;
+		c.weightx = 1;
+		needsBody.add(small("", MUTED), c);
+		c.weightx = 0;
+		for (Potion potion : Potion.values())
+		{
+			if (potion.isSupply())
+			{
+				c.gridx++;
+				JLabel head = small(potion.getShortName(), MUTED);
+				head.setHorizontalAlignment(SwingConstants.CENTER);
+				head.setToolTipText(potion.getDisplayName());
+				needsBody.add(head, c);
+			}
+		}
+		for (CmRoom room : CmRoom.values())
+		{
+			c.gridy++;
+			c.gridx = 0;
+			c.weightx = 1;
+			JLabel label = small(room.getDisplayName(), Color.WHITE);
+			roomLabels.put(room, label);
+			needsBody.add(label, c);
+			c.weightx = 0;
+			Map<Potion, JTextField> fields = new EnumMap<>(Potion.class);
+			for (Potion potion : Potion.values())
+			{
+				if (!potion.isSupply())
+				{
+					continue;
+				}
+				c.gridx++;
+				JTextField field = new JTextField("0", 2);
+				field.setFont(FontManager.getRunescapeSmallFont());
+				field.setHorizontalAlignment(SwingConstants.CENTER);
+				field.setMargin(new Insets(1, 1, 1, 1));
+				field.setToolTipText(potion.getDisplayName() + " doses to drink at " + room.getDisplayName());
+				Runnable commit = () ->
+				{
+					int doses;
+					try
+					{
+						doses = Integer.parseInt(field.getText().trim());
+					}
+					catch (NumberFormatException ex)
+					{
+						doses = 0;
+					}
+					actions.setNeed(room, potion, doses);
+				};
+				field.addActionListener(e -> commit.run());
+				field.addFocusListener(new FocusAdapter()
+				{
+					@Override
+					public void focusLost(FocusEvent e)
+					{
+						commit.run();
+					}
+				});
+				fields.put(potion, field);
+				needsBody.add(field, c);
+			}
+			needFields.put(room, fields);
+		}
+
+		JPanel needs = new JPanel(new BorderLayout(0, 4));
+		needs.setOpaque(false);
+		needs.add(header, BorderLayout.NORTH);
+		needs.add(needsBody, BorderLayout.CENTER);
+		return needs;
 	}
 
 	private JPanel buildRoles()
@@ -383,11 +486,29 @@ class CoxTeamPanel extends PluginPanel
 			label.setToolTipText(detail.getToolTipText());
 			moreLabels.get(potion).setToolTipText(detail.getToolTipText());
 
-			JSpinner spinner = needSpinners.get(potion);
-			if (!Integer.valueOf(need).equals(spinner.getValue()))
+			needLabels.get(potion).setText(String.valueOf(need));
+		}
+		updateNeeds(state);
+	}
+
+	private void updateNeeds(PanelState state)
+	{
+		for (Map.Entry<CmRoom, Map<Potion, JTextField>> room : needFields.entrySet())
+		{
+			StringBuilder fromHere = new StringBuilder("<html>From " + room.getKey().getDisplayName()
+				+ " on you still drink:");
+			for (Map.Entry<Potion, JTextField> e : room.getValue().entrySet())
 			{
-				spinner.setValue(need);
+				String value = String.valueOf(state.needs.get(room.getKey(), e.getKey()));
+				JTextField field = e.getValue();
+				if (!field.hasFocus() && !field.getText().equals(value))
+				{
+					field.setText(value);
+				}
+				fromHere.append("<br>").append(e.getKey().getDisplayName()).append(' ')
+					.append(state.needs.fromRoomOn(room.getKey(), e.getKey()));
 			}
+			roomLabels.get(room.getKey()).setToolTipText(fromHere.append("</html>").toString());
 		}
 	}
 

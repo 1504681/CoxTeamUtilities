@@ -5,7 +5,6 @@ import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
 import net.runelite.client.config.Notification;
-import net.runelite.client.config.Range;
 
 @ConfigGroup(CoxTeamUtilitiesConfig.GROUP)
 public interface CoxTeamUtilitiesConfig extends Config
@@ -13,10 +12,11 @@ public interface CoxTeamUtilitiesConfig extends Config
 	String GROUP = "coxteamutilities";
 	String KEY_ROLES = "roles";
 	String KEY_PLAN = "plan";
+	String KEY_NEEDS = "needs";
 
 	@ConfigSection(
-		name = "Doses needed",
-		description = "How many doses you want to have by Olm. Also editable in the sidebar.",
+		name = "Supplies",
+		description = "What counts towards the doses you need. The doses themselves are set per room in the sidebar.",
 		position = 0
 	)
 	String needSection = "need";
@@ -27,58 +27,6 @@ public interface CoxTeamUtilitiesConfig extends Config
 		position = 1
 	)
 	String reminderSection = "reminders";
-
-	@Range(max = 99)
-	@ConfigItem(
-		keyName = "needOverload",
-		name = "Overload",
-		description = "Overload doses you want. 0 hides the shortfall.",
-		section = needSection,
-		position = 0
-	)
-	default int needOverload()
-	{
-		return 4;
-	}
-
-	@Range(max = 99)
-	@ConfigItem(
-		keyName = "needXericsAid",
-		name = "Xeric's aid",
-		description = "Xeric's aid doses you want. 0 hides the shortfall.",
-		section = needSection,
-		position = 1
-	)
-	default int needXericsAid()
-	{
-		return 12;
-	}
-
-	@Range(max = 99)
-	@ConfigItem(
-		keyName = "needRevitalisation",
-		name = "Revitalisation",
-		description = "Revitalisation doses you want. 0 hides the shortfall.",
-		section = needSection,
-		position = 2
-	)
-	default int needRevitalisation()
-	{
-		return 8;
-	}
-
-	@Range(max = 99)
-	@ConfigItem(
-		keyName = "needPrayerEnhance",
-		name = "Prayer enhance",
-		description = "Prayer enhance doses you want. 0 hides the shortfall.",
-		section = needSection,
-		position = 3
-	)
-	default int needPrayerEnhance()
-	{
-		return 4;
-	}
 
 	@ConfigItem(
 		keyName = "countClaimed",
@@ -183,6 +131,17 @@ public interface CoxTeamUtilitiesConfig extends Config
 		hidden = true
 	)
 	default String roles()
+	{
+		return "";
+	}
+
+	@ConfigItem(
+		keyName = KEY_NEEDS,
+		name = "Doses needed",
+		description = "Doses needed per room, edited in the sidebar",
+		hidden = true
+	)
+	default String needs()
 	{
 		return "";
 	}

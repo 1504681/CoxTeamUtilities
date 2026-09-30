@@ -119,6 +119,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	private NavigationButton navigationButton;
 
 	private final DropPlan plan = new DropPlan();
+	private volatile NeedPlan needs = NeedPlan.defaults();
 
 	/** Guards everything below that the Swing, client and party threads share. */
 	private final Object lock = new Object();
@@ -157,6 +158,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			roles.addAll(Role.parse(split(config.roles())));
 		}
 		plan.merge(split(config.plan()));
+		needs = NeedPlan.parse(config.needs());
 
 		panel = new CoxTeamPanel(this, (label, itemId) -> itemManager.getImage(itemId).addTo(label));
 		navigationButton = NavigationButton.builder()
@@ -671,27 +673,13 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	}
 
 	@Override
-	public void setNeed(Potion potion, int doses)
+	public void setNeed(CmRoom room, Potion potion, int doses)
 	{
-		String key;
-		switch (potion)
+		if (needs.set(room, potion, doses))
 		{
-			case OVERLOAD:
-				key = "needOverload";
-				break;
-			case XERICS_AID:
-				key = "needXericsAid";
-				break;
-			case REVITALISATION:
-				key = "needRevitalisation";
-				break;
-			case PRAYER_ENHANCE:
-				key = "needPrayerEnhance";
-				break;
-			default:
-				return;
+			configManager.setConfiguration(CoxTeamUtilitiesConfig.GROUP, CoxTeamUtilitiesConfig.KEY_NEEDS, needs.encode());
+			refresh();
 		}
-		configManager.setConfiguration(CoxTeamUtilitiesConfig.GROUP, key, Math.max(0, Math.min(99, doses)));
 	}
 
 	@Override
@@ -815,23 +803,6 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 
 	// ---- drawing ----
 
-	private int need(Potion potion)
-	{
-		switch (potion)
-		{
-			case OVERLOAD:
-				return config.needOverload();
-			case XERICS_AID:
-				return config.needXericsAid();
-			case REVITALISATION:
-				return config.needRevitalisation();
-			case PRAYER_ENHANCE:
-				return config.needPrayerEnhance();
-			default:
-				return 0;
-		}
-	}
-
 	/** Pushes the current state to the sidebar and the overlay. Safe from any thread. */
 	private void refresh()
 	{
@@ -853,9 +824,10 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		state.countShared = config.countShared();
 		state.countClaimed = config.countClaimed();
 		state.countSplit = config.countSplit();
+		state.needs = needs.copy();
 		for (Potion potion : Potion.values())
 		{
-			state.need.put(potion, need(potion));
+			state.need.put(potion, state.needs.total(potion));
 		}
 
 		PartyMember local = party.getLocalMember();

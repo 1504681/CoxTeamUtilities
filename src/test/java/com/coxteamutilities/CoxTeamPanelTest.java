@@ -30,7 +30,7 @@ public class CoxTeamPanelTest
 		}
 
 		@Override
-		public void setNeed(Potion potion, int doses)
+		public void setNeed(CmRoom room, Potion potion, int doses)
 		{
 		}
 
@@ -69,10 +69,15 @@ public class CoxTeamPanelTest
 		state.inventory = Supplies.of(new int[]{4, 8, 4, 0});
 		state.privateStorage = Supplies.of(new int[]{0, 4, 0, 4});
 		state.claimed = Supplies.of(new int[]{4, 0, 0, 0});
-		state.need.put(Potion.OVERLOAD, 8);
-		state.need.put(Potion.XERICS_AID, 16);
-		state.need.put(Potion.REVITALISATION, 8);
-		state.need.put(Potion.PRAYER_ENHANCE, 4);
+		state.needs = NeedPlan.defaults();
+		state.needs.set(CmRoom.TEKTON, Potion.OVERLOAD, 1);
+		state.needs.set(CmRoom.VANGUARDS, Potion.OVERLOAD, 1);
+		state.needs.set(CmRoom.VANGUARDS, Potion.XERICS_AID, 4);
+		state.needs.set(CmRoom.MUTTADILE, Potion.OVERLOAD, 2);
+		for (Potion potion : Potion.values())
+		{
+			state.need.put(potion, state.needs.total(potion));
+		}
 
 		state.roles.addAll(EnumSet.of(Role.MUTTADILE_ZGS, Role.MUTTADILE_ENTANGLE, Role.TIGHTROPE_CHINS));
 		state.missing.put(Role.MUTTADILE_ENTANGLE, Arrays.asList("Standard spellbook", "Nature runes"));
