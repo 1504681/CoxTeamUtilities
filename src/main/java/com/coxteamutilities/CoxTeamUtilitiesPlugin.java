@@ -515,10 +515,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		List<String> lines = new ArrayList<>();
 		for (Map.Entry<Role, List<String>> e : missing.entrySet())
 		{
-			for (String item : e.getValue())
-			{
-				lines.add(item + " (" + e.getKey().getFullName() + ")");
-			}
+			lines.add(e.getKey().getDisplayName() + ": " + String.join(", ", e.getValue()));
 		}
 		return lines;
 	}
@@ -530,10 +527,20 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		{
 			return;
 		}
-		StringBuilder text = new StringBuilder("Missing for your CoX roles: ");
-		for (int i = 0; i < lines.size(); i++)
+		StringBuilder text = new StringBuilder("CoX missing - ");
+		String who = null;
+		for (MissingItemsOverlay.Line line : lines)
 		{
-			text.append(i == 0 ? "" : ", ").append(lines.get(i).who).append(" - ").append(lines.get(i).what);
+			if (!line.who.equals(who))
+			{
+				text.append(who == null ? "" : "; ").append(line.who).append(' ');
+				who = line.who;
+			}
+			else
+			{
+				text.append(", ");
+			}
+			text.append(line.what);
 		}
 		if (config.chatReminder())
 		{

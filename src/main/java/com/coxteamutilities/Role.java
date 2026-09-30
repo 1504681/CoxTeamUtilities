@@ -14,7 +14,7 @@ import java.util.Set;
 public enum Role
 {
 	TIGHTROPE_LURER(CmRoom.TIGHTROPE, "Lurer", "Lure the rangers and magers with a Venator bow or chinchompas",
-		Requirement.anyItem("Venator bow (charged) or chinchompas", ItemIds.VENATOR_BOW, ItemIds.VENATOR_BOW_ORNAMENT,
+		Requirement.anyItem("Venator bow or chins", ItemIds.VENATOR_BOW, ItemIds.VENATOR_BOW_ORNAMENT,
 			ItemIds.CHINCHOMPA, ItemIds.RED_CHINCHOMPA, ItemIds.BLACK_CHINCHOMPA)),
 	TIGHTROPE_TELEGRAB(CmRoom.TIGHTROPE, "Telegrabber", "Telegrab the keystone crystal",
 		Requirement.standardSpellbook(),
