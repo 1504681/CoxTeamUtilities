@@ -1,0 +1,8 @@
+{
+  "plugins": ["com.myplugin.MyPlugin"],
+  "displayName": "My Plugin",
+  "author": "1504681",
+  "description": "A RuneLite plugin",
+  "tags": ["example"],
+  "version": "1.0.0"
+}
