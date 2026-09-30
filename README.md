@@ -16,7 +16,7 @@ Tick the roles you're doing. You can tick more than one.
 
 Items count from your inventory, worn equipment, private storage and rune pouch. Only the law and nature runes are checked for the spells, not the elemental runes.
 
-If something is missing the role turns red in the sidebar, an overlay lists it at the raid lobby and inside the raid until it starts, and a chat message (only you see it) repeats it when you enter.
+If something is missing the role turns red in the sidebar, an overlay lists it at the raid lobby and inside the raid until it starts, and a chat message (only you see it) repeats it when you enter. Overlay and chat message are for teams; a setting turns them on for solo raids too.
 
 ## Supplies
 
@@ -72,6 +72,7 @@ Join a party with the core Party plugin. Each member with this plugin shows up u
 | Include party members in reminders | on |
 | Chat message on entry | on |
 | Olm entry reminder | on |
+| Role reminders in solo raids | off |
 | Notify on entry | off |
 
 ## TYFR

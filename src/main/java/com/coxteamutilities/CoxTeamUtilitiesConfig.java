@@ -115,6 +115,18 @@ public interface CoxTeamUtilitiesConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "remindSolo",
+		name = "Role reminders in solo raids",
+		description = "Show the missing-item overlay and chat message in a solo raid too. Off means only in a team",
+		section = reminderSection,
+		position = 6
+	)
+	default boolean remindSolo()
+	{
+		return false;
+	}
+
+	@ConfigItem(
 		keyName = "olmReminder",
 		name = "Olm entry reminder",
 		description = "Chat message with what you're still short when you enter Olm",

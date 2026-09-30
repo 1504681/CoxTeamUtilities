@@ -369,7 +369,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 
 	private boolean overlayVisible()
 	{
-		if (!config.overlay())
+		if (!config.overlay() || !remindersOn())
 		{
 			return false;
 		}
@@ -378,6 +378,12 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			return config.overlayDuringRaid() || client.getVarbitValue(VarbitID.RAIDS_CLIENT_PROGRESS) == 0;
 		}
 		return region() == LOBBY_REGION;
+	}
+
+	/** Role reminders are for teams unless asked for in solos too. Party size is 0 or 1 when alone. */
+	private boolean remindersOn()
+	{
+		return config.remindSolo() || client.getVarbitValue(VarbitID.RAIDS_CLIENT_PARTYSIZE) > 1;
 	}
 
 	/** Region of the local player, the template's region inside an instance, -1 when not logged in. */
@@ -523,7 +529,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	private void remindOnEntry()
 	{
 		List<MissingItemsOverlay.Line> lines = missingLines();
-		if (lines.isEmpty())
+		if (lines.isEmpty() || !remindersOn())
 		{
 			return;
 		}
