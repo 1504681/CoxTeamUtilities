@@ -22,12 +22,14 @@ import java.util.List;
 import java.util.Map;
 import javax.swing.JCheckBox;
 import javax.swing.JCheckBoxMenuItem;
+import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.border.EmptyBorder;
@@ -48,6 +50,18 @@ class CoxTeamPanel extends PluginPanel
 
 		/** Thanks for the raid: drops every claim and role you have. */
 		void finishRaid();
+
+		void renameChest(String key, String name);
+
+		void setChestOrdered(String key, boolean ordered);
+
+		/** Replaces a chest's deposit (true) or withdraw (false) list with the lines of the text. */
+		void setChestLines(String key, boolean deposit, String text);
+
+		/** Replaces a chest's list with what's in the inventory right now, in slot order. */
+		void fillChestFromInventory(String key, boolean deposit);
+
+		void deleteChest(String key);
 
 		void setDropCount(CmRoom room, Potion potion, int count);
 
@@ -128,6 +142,18 @@ class CoxTeamPanel extends PluginPanel
 	private final JLabel soloTab = small("Solo", MUTED);
 	private NeedUnits units = NeedUnits.DOSES;
 	private final JPanel storageGrid = new JPanel(new GridBagLayout());
+	private final Stack chestsBody = new Stack(ColorScheme.DARKER_GRAY_COLOR);
+	private final JComboBox<String> chestChooser = new JComboBox<>();
+	private final JTextField chestName = new JTextField();
+	private final JCheckBox chestOrdered = new JCheckBox("Withdraw in this order");
+	private final JTextArea chestDeposit = new JTextArea(2, 10);
+	private final JTextArea chestWithdraw = new JTextArea(3, 10);
+	private final Stack chestSteps = new Stack(null);
+	private final JLabel chestHere = small("", MUTED);
+	private final JPanel chestEditor = new JPanel(new BorderLayout());
+	private final List<String> chestKeys = new ArrayList<>();
+	private String selectedChest;
+	private String lastCurrentChest;
 	private final JLabel claimCount = small("", GOOD);
 	private final JLabel claimsToggle = small("show", MUTED);
 	private final JPanel claimsSection = new JPanel(new BorderLayout());
@@ -139,6 +165,7 @@ class CoxTeamPanel extends PluginPanel
 	private boolean updating;
 	private String teamSignature;
 	private String dropsSignature;
+	private PanelState lastState;
 
 	CoxTeamPanel(Actions actions, Icons icons)
 	{
@@ -155,6 +182,15 @@ class CoxTeamPanel extends PluginPanel
 		content.addRow(buildRoles(), 4);
 		content.addRow(header("Team", null), 12);
 		content.addRow(padded(teamBody), 4);
+		content.addRow(header("Chests", chip("Delete", ColorScheme.DARKER_GRAY_COLOR,
+			"Forget the chest shown below", () ->
+			{
+				if (selectedChest != null)
+				{
+					actions.deleteChest(selectedChest);
+				}
+			})), 12);
+		content.addRow(buildChests(), 4);
 		content.addRow(claimsHeader(), 12);
 		claimsSection.setOpaque(false);
 		claimsSection.add(padded(dropsBody), BorderLayout.CENTER);
@@ -393,6 +429,188 @@ class CoxTeamPanel extends PluginPanel
 		}
 	}
 
+	/** A chooser for the chest, its name, and the two lists with what the inventory says about them. */
+	private JPanel buildChests()
+	{
+		chestsBody.setBorder(new EmptyBorder(6, 6, 6, 6));
+		chestsBody.addRow(chestHere, 0);
+
+		chestChooser.setFont(FontManager.getRunescapeSmallFont());
+		chestChooser.setPreferredSize(new Dimension(100, 24));
+		chestChooser.addActionListener(e ->
+		{
+			int index = chestChooser.getSelectedIndex();
+			if (!updating && index >= 0 && index < chestKeys.size())
+			{
+				selectedChest = chestKeys.get(index);
+				showChest(lastState);
+			}
+		});
+
+		chestName.setFont(FontManager.getRunescapeSmallFont());
+		chestName.setToolTipText("Your name for this chest");
+		commitOn(chestName, () -> actions.renameChest(selectedChest, chestName.getText()));
+
+		chestOrdered.setOpaque(false);
+		chestOrdered.setFont(FontManager.getRunescapeSmallFont());
+		chestOrdered.setForeground(Color.WHITE);
+		chestOrdered.setToolTipText("Take things out top to bottom; the next one is lit up in the storage");
+		chestOrdered.addActionListener(e ->
+		{
+			if (!updating && selectedChest != null)
+			{
+				actions.setChestOrdered(selectedChest, chestOrdered.isSelected());
+			}
+		});
+
+		Stack editor = new Stack(null);
+		editor.addRow(chestChooser, 0);
+		editor.addRow(chestName, 4);
+		editor.addRow(chestOrdered, 4);
+		editor.addRow(listHeader("Put in", true), 6);
+		editor.addRow(listArea(chestDeposit, true), 2);
+		editor.addRow(listHeader("Take out", false), 6);
+		editor.addRow(listArea(chestWithdraw, false), 2);
+		editor.addRow(chestSteps, 6);
+		chestEditor.setOpaque(false);
+		chestEditor.add(editor, BorderLayout.CENTER);
+		chestsBody.addRow(chestEditor, 4);
+		return chestsBody;
+	}
+
+	private JPanel listHeader(String title, boolean deposit)
+	{
+		JPanel header = new JPanel(new BorderLayout());
+		header.setOpaque(false);
+		header.add(small(title, Color.WHITE), BorderLayout.WEST);
+		header.add(chip("\u2190 inventory", ColorScheme.DARK_GRAY_COLOR,
+			"Replace the list with what's in your inventory now, in slot order", () ->
+			{
+				if (selectedChest != null)
+				{
+					actions.fillChestFromInventory(selectedChest, deposit);
+				}
+			}), BorderLayout.EAST);
+		return header;
+	}
+
+	private JTextArea listArea(JTextArea area, boolean deposit)
+	{
+		area.setFont(FontManager.getRunescapeSmallFont());
+		area.setLineWrap(true);
+		area.setWrapStyleWord(true);
+		area.setMargin(new Insets(3, 3, 3, 3));
+		area.setToolTipText("<html>One item per line, matched from the start of its name, so 'Xeric's aid' is any dose."
+			+ "<br>'Stinkhorn mushroom x3' for a number" + (deposit ? ", 'everything' to empty the inventory" : "") + ".</html>");
+		area.addFocusListener(new FocusAdapter()
+		{
+			@Override
+			public void focusLost(FocusEvent e)
+			{
+				if (selectedChest != null)
+				{
+					actions.setChestLines(selectedChest, deposit, area.getText());
+				}
+			}
+		});
+		return area;
+	}
+
+	private static void commitOn(JTextField field, Runnable commit)
+	{
+		field.addActionListener(e -> commit.run());
+		field.addFocusListener(new FocusAdapter()
+		{
+			@Override
+			public void focusLost(FocusEvent e)
+			{
+				commit.run();
+			}
+		});
+	}
+
+	private void updateChests(PanelState state)
+	{
+		List<ChestPlan> plans = state.chests.all();
+		if (state.currentChest != null && !state.currentChest.equals(lastCurrentChest) && state.chests.get(state.currentChest) != null)
+		{
+			selectedChest = state.currentChest;
+		}
+		lastCurrentChest = state.currentChest;
+		if (state.chests.get(selectedChest) == null)
+		{
+			selectedChest = state.chests.get(state.currentChest) != null ? state.currentChest
+				: plans.isEmpty() ? null : plans.get(0).getKey();
+		}
+
+		chestKeys.clear();
+		chestChooser.removeAllItems();
+		for (ChestPlan plan : plans)
+		{
+			chestKeys.add(plan.getKey());
+			chestChooser.addItem(plan.getName().isEmpty() ? plan.getKey() : plan.getName());
+		}
+		chestEditor.setVisible(!plans.isEmpty());
+		if (plans.isEmpty())
+		{
+			chestHere.setText("<html>Open a storage unit in a raid and it shows up here, with a list of what to put in and take out.</html>");
+		}
+		else if (state.currentChest == null)
+		{
+			chestHere.setText("Not at a chest");
+		}
+		else
+		{
+			ChestPlan here = state.chests.get(state.currentChest);
+			chestHere.setText("At: " + (here == null ? CoxTeamUtilitiesPlugin.chestName(state.currentChest) + " (not set up yet, open it)"
+				: here.getName()));
+		}
+		showChest(state);
+	}
+
+	private void showChest(PanelState state)
+	{
+		ChestPlan plan = state == null ? null : state.chests.get(selectedChest);
+		if (plan == null)
+		{
+			return;
+		}
+		int index = chestKeys.indexOf(plan.getKey());
+		if (chestChooser.getSelectedIndex() != index)
+		{
+			chestChooser.setSelectedIndex(index);
+		}
+		setIfIdle(chestName, plan.getName());
+		chestOrdered.setSelected(plan.isOrdered());
+		setIfIdle(chestDeposit, String.join("\n", plan.getDeposit()));
+		setIfIdle(chestWithdraw, String.join("\n", plan.getWithdraw()));
+
+		chestSteps.clear();
+		if (plan.getKey().equals(state.currentChest))
+		{
+			ChestProgress progress = new ChestProgress(plan, state.inventoryNames);
+			ChestProgress.Step next = progress.next();
+			for (ChestProgress.Step step : progress.deposits)
+			{
+				chestSteps.addRow(small((step.done ? "\u2713 " : "\u2022 ") + "in: " + step.line.text, step.done ? GOOD : Color.WHITE), 0);
+			}
+			for (ChestProgress.Step step : progress.withdrawals)
+			{
+				String prefix = step.done ? "\u2713 " : step == next ? "\u2192 " : "\u2022 ";
+				chestSteps.addRow(small(prefix + (plan.isOrdered() ? step.order + ". " : "out: ") + step.line.text,
+					step.done ? GOOD : step == next ? WARN : Color.WHITE), 0);
+			}
+		}
+	}
+
+	private static void setIfIdle(javax.swing.text.JTextComponent field, String text)
+	{
+		if (!field.hasFocus() && !field.getText().equals(text))
+		{
+			field.setText(text);
+		}
+	}
+
 	/** Team | Solo, which set of "need" numbers is shown and edited. */
 	private JPanel needsTabs()
 	{
@@ -497,8 +715,10 @@ class CoxTeamPanel extends PluginPanel
 		updating = true;
 		try
 		{
+			lastState = state;
 			updateSupplies(state);
 			updateRoles(state);
+			updateChests(state);
 			String team = state.teamSignature();
 			if (!team.equals(teamSignature))
 			{

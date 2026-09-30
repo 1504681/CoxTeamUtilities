@@ -1,5 +1,8 @@
 package com.coxteamutilities;
 
+import java.awt.Color;
+
+import net.runelite.client.config.Alpha;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -15,6 +18,7 @@ public interface CoxTeamUtilitiesConfig extends Config
 	String KEY_NEEDS = "needs";
 	String KEY_NEEDS_SOLO = "needsSolo";
 	String KEY_NEEDS_TAB_SOLO = "needsTabSolo";
+	String KEY_CHESTS = "chests";
 
 	@ConfigSection(
 		name = "Supplies",
@@ -29,6 +33,13 @@ public interface CoxTeamUtilitiesConfig extends Config
 		position = 1
 	)
 	String reminderSection = "reminders";
+
+	@ConfigSection(
+		name = "Chests",
+		description = "Deposit and withdraw lists per storage unit, set up in the sidebar",
+		position = 2
+	)
+	String chestSection = "chests";
 
 	@ConfigItem(
 		keyName = "needUnits",
@@ -172,6 +183,91 @@ public interface CoxTeamUtilitiesConfig extends Config
 	default Notification notification()
 	{
 		return Notification.OFF;
+	}
+
+	@ConfigItem(
+		keyName = "chestOverlay",
+		name = "Steps overlay",
+		description = "List the chest's steps on screen while its storage is open",
+		section = chestSection,
+		position = 0
+	)
+	default boolean chestOverlay()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "chestGlow",
+		name = "Glow items",
+		description = "Outline the items still to move in the storage and the inventory",
+		section = chestSection,
+		position = 1
+	)
+	default boolean chestGlow()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "chestOrderedGlow",
+		name = "Ordered withdraw glow",
+		description = "With an ordered withdraw list: glow just the next item, or all of them from the first colour to the last",
+		section = chestSection,
+		position = 2
+	)
+	default ChestGlow chestOrderedGlow()
+	{
+		return ChestGlow.NEXT_ONLY;
+	}
+
+	@Alpha
+	@ConfigItem(
+		keyName = "chestGlowColor",
+		name = "Glow colour",
+		description = "Outline colour, and the first colour of the gradient",
+		section = chestSection,
+		position = 3
+	)
+	default Color chestGlowColor()
+	{
+		return new Color(0, 255, 220, 220);
+	}
+
+	@Alpha
+	@ConfigItem(
+		keyName = "chestGlowLastColor",
+		name = "Gradient end colour",
+		description = "Colour of the last item in an ordered list when all of them glow",
+		section = chestSection,
+		position = 4
+	)
+	default Color chestGlowLastColor()
+	{
+		return new Color(255, 80, 200, 220);
+	}
+
+	@ConfigItem(
+		keyName = "chestGlowPulse",
+		name = "Pulse",
+		description = "Make the outline breathe",
+		section = chestSection,
+		position = 5
+	)
+	default boolean chestGlowPulse()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = KEY_CHESTS,
+		name = "Chests",
+		description = "Chest plans, edited in the sidebar",
+		hidden = true
+	)
+	default String chests()
+	{
+		return "";
 	}
 
 	@ConfigItem(

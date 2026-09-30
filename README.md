@@ -57,6 +57,12 @@ A split overload is the elder, twisted and kodai that Vanguards drop, claimed as
 
 The wiki has no numbers for larger teams, so use `-` and `+` to set what your team size gets. Edited counts are kept between raids. The Vanguards overload count is random, so it goes back to 1 after each raid. Right click a room name to add a potion the table doesn't list. Claims are cleared when you leave the raid.
 
+## Chests
+
+Each storage unit in the raid gets its own plan: what to put in and what to take out. Open a storage unit and the chest appears under **Chests**, named after its room (`Ice Demon`, `Farming 1`, `Farming 2`, the two farming rooms are told apart by which comes first). Rename it, then fill the two lists: one item per line, matched from the start of the name so `Xeric's aid` is any dose, `Stinkhorn mushroom x3` for a number, `everything` to empty the inventory. `← inventory` fills a list from what you're carrying right now, in slot order, which is the easy way to set up an ordered withdraw: arrange your inventory once, click the button.
+
+Tick **Withdraw in this order** and the list becomes steps 1, 2, 3. While the storage is open an overlay lists the steps and ticks them off as your inventory changes, and the items still to move glow: in the side inventory what goes in, in the storage what comes out. Ordered lists glow only the next item, or all of them in a gradient from the first colour to the last with their numbers (setting). Colours and the pulse are settings too.
+
 ## Party
 
 Join a party with the core Party plugin. Each member with this plugin shows up under Team with their roles and missing items, and in the Supplies grid with their doses. Claims, drop count edits and the shared storage contents are shared.
@@ -76,6 +82,11 @@ Join a party with the core Party plugin. Each member with this plugin shows up u
 | Chat message on entry | on |
 | Olm entry reminder | on |
 | Role reminders in solo raids | off |
+| Chest steps overlay | on |
+| Glow items | on |
+| Ordered withdraw glow | only the next one |
+| Glow colour / gradient end colour | cyan / pink |
+| Pulse | on |
 | Notify on entry | off |
 
 ## TYFR

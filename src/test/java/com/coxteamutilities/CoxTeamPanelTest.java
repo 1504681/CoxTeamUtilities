@@ -45,6 +45,31 @@ public class CoxTeamPanelTest
 		}
 
 		@Override
+		public void renameChest(String key, String name)
+		{
+		}
+
+		@Override
+		public void setChestOrdered(String key, boolean ordered)
+		{
+		}
+
+		@Override
+		public void setChestLines(String key, boolean deposit, String text)
+		{
+		}
+
+		@Override
+		public void fillChestFromInventory(String key, boolean deposit)
+		{
+		}
+
+		@Override
+		public void deleteChest(String key)
+		{
+		}
+
+		@Override
 		public void setDropCount(CmRoom room, Potion potion, int count)
 		{
 		}
@@ -85,6 +110,14 @@ public class CoxTeamPanelTest
 		{
 			state.need.put(potion, state.applies(potion) ? needs.get(potion) : 0);
 		}
+		ChestPlan ice = state.chests.getOrCreate("RAIDS_ICE_DEMON#1", "Ice Demon");
+		ice.getDeposit().add("Elder maul");
+		ChestPlan farm = state.chests.getOrCreate("RAIDS_FARMING#1", "Farming 1");
+		farm.getDeposit().add("everything");
+		farm.getWithdraw().addAll(Arrays.asList("Xeric's aid x2", "Stinkhorn mushroom x3", "Noxifer"));
+		farm.setOrdered(true);
+		state.currentChest = "RAIDS_FARMING#1";
+		state.inventoryNames = Arrays.asList("Xeric's aid(4)", "Xeric's aid(3)", "Stinkhorn mushroom");
 		state.roles.addAll(EnumSet.of(Role.MUTTADILE_ZGS, Role.MUTTADILE_ENTANGLE, Role.TIGHTROPE_LURER));
 		state.missing.put(Role.MUTTADILE_ENTANGLE, Arrays.asList("Standard spellbook", "Nature runes"));
 

@@ -1,0 +1,88 @@
+package com.coxteamutilities;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import org.junit.Test;
+
+public class ChestPlanTest
+{
+	@Test
+	public void linesMatchFromTheStartWithACount()
+	{
+		ChestPlan.Line aid = new ChestPlan.Line("Xeric's aid");
+		assertTrue(aid.matches("Xeric's aid(4)"));
+		assertTrue(aid.matches("xeric's aid(1)"));
+		assertFalse(aid.matches("Overload(4)"));
+		ChestPlan.Line shrooms = new ChestPlan.Line("Stinkhorn mushroom x3");
+		assertEquals("Stinkhorn mushroom", shrooms.name);
+		assertEquals(3, shrooms.count);
+		ChestPlan.Line axe = new ChestPlan.Line("Dragon axe");
+		assertEquals(1, axe.count);
+		assertTrue(new ChestPlan.Line("everything").everything);
+		assertTrue(new ChestPlan.Line("Everything").matches("anything at all"));
+	}
+
+	@Test
+	public void inventoryBecomesLinesInSlotOrder()
+	{
+		List<String> lines = ChestPlan.fromInventory(Arrays.asList(
+			"Elder maul", "Xeric's aid(4)", "Xeric's aid(3)", null, "Toxic blowpipe (charged)", "Xeric's aid(4)"));
+		assertEquals(Arrays.asList("Elder maul", "Xeric's aid x2", "Toxic blowpipe", "Xeric's aid"), lines);
+	}
+
+	@Test
+	public void typedTextBecomesTrimmedLines()
+	{
+		assertEquals(Arrays.asList("Elder maul", "Overload"), ChestPlan.lines("  Elder maul \n\n Overload\n"));
+		assertTrue(ChestPlan.lines(null).isEmpty());
+	}
+
+	@Test
+	public void progressTicksOffWhatIsInTheInventory()
+	{
+		ChestPlan plan = new ChestPlan("RAIDS_FARMING#1", "Farming 1");
+		plan.getDeposit().add("Elder maul");
+		plan.getWithdraw().addAll(Arrays.asList("Xeric's aid x2", "Stinkhorn mushroom", "Overload"));
+		plan.setOrdered(true);
+
+		ChestProgress before = new ChestProgress(plan, Arrays.asList("Elder maul", "Xeric's aid(4)"));
+		assertFalse(before.deposits.get(0).done);
+		assertFalse(before.withdrawals.get(0).done);
+		assertEquals("Xeric's aid x2", before.next().line.text);
+		assertTrue(before.highlightsDeposit("Elder maul"));
+		assertFalse(before.highlightsDeposit("Overload(4)"));
+		assertEquals(1, before.highlightsWithdraw("Xeric's aid(3)", true).order);
+		assertNull(before.highlightsWithdraw("Overload(4)", true));
+		assertEquals(3, before.highlightsWithdraw("Overload(4)", false).order);
+		assertFalse(before.isDone());
+
+		ChestProgress after = new ChestProgress(plan,
+			Arrays.asList("Xeric's aid(4)", "Xeric's aid(4)", "Stinkhorn mushroom", "Overload(4)"));
+		assertTrue(after.isDone());
+		assertNull(after.next());
+		assertNull(after.highlightsWithdraw("Overload(4)", false));
+	}
+
+	@Test
+	public void depositEverythingMeansAnEmptyInventory()
+	{
+		ChestPlan plan = new ChestPlan("RAIDS_ICE_DEMON#1", "Ice demon");
+		plan.getDeposit().add("everything");
+		assertFalse(new ChestProgress(plan, Collections.singletonList("Bronze dagger")).isDone());
+		assertTrue(new ChestProgress(plan, Collections.emptyList()).isDone());
+		assertTrue(new ChestProgress(plan, Collections.singletonList("Bronze dagger")).highlightsDeposit("Bronze dagger"));
+	}
+
+	@Test
+	public void unorderedPlansHaveNoNext()
+	{
+		ChestPlan plan = new ChestPlan("k", "n");
+		plan.getWithdraw().add("Overload");
+		assertNull(new ChestProgress(plan, Collections.emptyList()).next());
+	}
+}

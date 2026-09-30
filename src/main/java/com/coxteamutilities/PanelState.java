@@ -261,6 +261,10 @@ final class PanelState
 	boolean separateSoloNeeds;
 	boolean trackStamina;
 	NeedUnits units = NeedUnits.DOSES;
+	ChestBook chests = new ChestBook();
+	/** Chest of the room the player is in, null outside one. */
+	String currentChest;
+	List<String> inventoryNames = new ArrayList<>();
 
 	final Set<Role> roles = EnumSet.noneOf(Role.class);
 	final Map<Role, List<String>> missing = new EnumMap<>(Role.class);
