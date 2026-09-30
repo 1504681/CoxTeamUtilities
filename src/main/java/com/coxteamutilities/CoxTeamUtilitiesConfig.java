@@ -194,7 +194,7 @@ public interface CoxTeamUtilitiesConfig extends Config
 	)
 	default boolean chestOverlay()
 	{
-		return true;
+		return false;
 	}
 
 	@ConfigItem(

@@ -84,7 +84,7 @@ Join a party with the core Party plugin. Each member with this plugin shows up u
 | Chat message on entry | on |
 | Olm entry reminder | on |
 | Role reminders in solo raids | off |
-| Chest steps overlay | on |
+| Chest steps overlay | off |
 | Glow items | on |
 | Ordered withdraw glow | only the next one |
 | Glow colour / gradient end colour | cyan / pink |
