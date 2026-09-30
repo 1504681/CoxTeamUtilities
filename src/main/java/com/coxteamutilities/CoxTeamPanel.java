@@ -342,7 +342,7 @@ class CoxTeamPanel extends PluginPanel
 			c.gridy++;
 			Supplies held = member.status == null ? null : member.status.getHeld();
 			boolean storageUnknown = member.status != null && member.status.getStored() == null;
-			String note = held == null ? "No plugin: the game doesn't show other players' inventories"
+			String note = held == null ? "Nothing known: ask them to install CoX Team Utilities from the Plugin Hub"
 				: storageUnknown ? "Inventory only, " + (member.self ? "your" : "their")
 				+ " private storage hasn't been opened this raid" : null;
 			gridRow(c, member.self ? "You" : member.name, held == null ? MUTED : member.self ? GOOD : Color.WHITE, potions,
