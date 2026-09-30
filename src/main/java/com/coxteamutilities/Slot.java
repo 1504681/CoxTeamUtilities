@@ -33,7 +33,8 @@ public final class Slot
 			{
 				return null;
 			}
-			return new Slot(CmRoom.valueOf(parts[0]), Potion.valueOf(parts[1]), index);
+			Potion potion = Potion.valueOf(parts[1]);
+			return potion.isClaimable() ? new Slot(CmRoom.valueOf(parts[0]), potion, index) : null;
 		}
 		catch (IllegalArgumentException e)
 		{

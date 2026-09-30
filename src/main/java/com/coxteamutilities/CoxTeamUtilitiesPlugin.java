@@ -783,6 +783,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		state.inParty = party.isInParty();
 		state.countShared = config.countShared();
 		state.countClaimed = config.countClaimed();
+		state.countSplit = config.countSplit();
 		for (Potion potion : Potion.values())
 		{
 			state.need.put(potion, need(potion));

@@ -18,7 +18,9 @@ public class DropPlanTest
 		assertEquals(0, plan.count(CmRoom.TEKTON, Potion.XERICS_AID));
 		assertEquals(1, plan.count(CmRoom.VANGUARDS, Potion.OVERLOAD));
 		assertEquals(4, plan.count(CmRoom.VANGUARDS, Potion.XERICS_AID));
-		assertEquals(2, plan.count(CmRoom.VASA, Potion.TWISTED));
+		assertEquals(1, plan.count(CmRoom.VANGUARDS, Potion.SPLIT_OVERLOAD));
+		assertEquals(0, plan.count(CmRoom.VANGUARDS, Potion.ELDER));
+		assertEquals(0, plan.count(CmRoom.VASA, Potion.TWISTED));
 		assertEquals(2, plan.count(CmRoom.MUTTADILE, Potion.PRAYER_ENHANCE));
 		assertEquals(0, plan.count(CmRoom.SHAMANS, Potion.OVERLOAD));
 		assertTrue(plan.encode().isEmpty());
@@ -125,14 +127,26 @@ public class DropPlanTest
 	}
 
 	@Test
+	public void partsOfASplitOverloadCannotBePlanned()
+	{
+		DropPlan plan = new DropPlan();
+		assertFalse(plan.set(CmRoom.VASA, Potion.TWISTED, 2));
+		assertFalse(plan.merge(Collections.singletonList("VASA:TWISTED:2:1")));
+		assertEquals(0, plan.count(CmRoom.VASA, Potion.TWISTED));
+		assertTrue(plan.set(CmRoom.VANGUARDS, Potion.SPLIT_OVERLOAD, 2));
+	}
+
+	@Test
 	public void slotsParseBackAndRejectJunk()
 	{
-		Slot slot = new Slot(CmRoom.VASA, Potion.TWISTED, 1);
-		assertEquals("VASA:TWISTED:1", slot.key());
+		Slot slot = new Slot(CmRoom.VANGUARDS, Potion.SPLIT_OVERLOAD, 1);
+		assertEquals("VANGUARDS:SPLIT_OVERLOAD:1", slot.key());
 		assertEquals(slot, Slot.parse(slot.key()));
-		assertNull(Slot.parse("VASA:TWISTED"));
-		assertNull(Slot.parse("VASA:TWISTED:-1"));
-		assertNull(Slot.parse("VASA:TWISTED:99"));
+		assertNull(Slot.parse("VASA:OVERLOAD"));
+		assertNull(Slot.parse("VASA:OVERLOAD:-1"));
+		assertNull(Slot.parse("VASA:OVERLOAD:99"));
+		// the three parts aren't claimed one by one
+		assertNull(Slot.parse("VANGUARDS:TWISTED:0"));
 		assertNull(Slot.parse("VASA:BEER:0"));
 		assertNull(Slot.parse(null));
 	}

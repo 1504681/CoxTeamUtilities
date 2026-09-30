@@ -48,6 +48,12 @@ public final class Supplies
 		return doses[potion.ordinal()];
 	}
 
+	/** Doses of elder, twisted and kodai that can be drunk as a set, which is what an overload dose is. */
+	public int splitOverloadDoses()
+	{
+		return Math.min(doses(Potion.ELDER), Math.min(doses(Potion.TWISTED), doses(Potion.KODAI)));
+	}
+
 	public Supplies plus(Supplies other)
 	{
 		int[] sum = new int[doses.length];

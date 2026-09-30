@@ -42,6 +42,7 @@ final class PanelState
 	boolean inParty;
 	boolean countShared;
 	boolean countClaimed;
+	boolean countSplit;
 
 	Supplies inventory = Supplies.EMPTY;
 	/** null until the storage has been opened this raid */
@@ -56,21 +57,42 @@ final class PanelState
 	final List<Member> team = new ArrayList<>();
 	final List<RoomDrops> drops = new ArrayList<>();
 
-	/** Doses that count towards what you need. */
-	int have(Potion potion)
+	/** Everything within reach: inventory, private storage, and shared storage if that counts. */
+	private Supplies held()
 	{
-		int have = inventory.doses(potion);
+		Supplies held = inventory;
 		if (privateStorage != null)
 		{
-			have += privateStorage.doses(potion);
+			held = held.plus(privateStorage);
 		}
 		if (countShared && sharedStorage != null)
 		{
-			have += sharedStorage.doses(potion);
+			held = held.plus(sharedStorage);
 		}
+		return held;
+	}
+
+	/** Overload doses you hold as sets of elder, twisted and kodai. */
+	int splitHeld()
+	{
+		return held().splitOverloadDoses();
+	}
+
+	/** Doses that count towards what you need. */
+	int have(Potion potion)
+	{
+		int have = held().doses(potion);
 		if (countClaimed)
 		{
 			have += claimed.doses(potion);
+		}
+		if (potion == Potion.OVERLOAD && countSplit)
+		{
+			have += splitHeld();
+			if (countClaimed)
+			{
+				have += claimed.doses(Potion.SPLIT_OVERLOAD);
+			}
 		}
 		return have;
 	}

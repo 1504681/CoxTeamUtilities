@@ -27,10 +27,11 @@ public final class DropPlan
 		wiki(CmRoom.TEKTON, Potion.OVERLOAD, 2, Potion.REVITALISATION, 1, Potion.PRAYER_ENHANCE, 1);
 		// 1/3 per vanguard for an overload, at least 1 and at most 3 for the room
 		wiki(CmRoom.VANGUARDS, Potion.OVERLOAD, 1, Potion.XERICS_AID, 4, Potion.REVITALISATION, 2,
-			Potion.PRAYER_ENHANCE, 1, Potion.ELDER, 1, Potion.TWISTED, 1, Potion.KODAI, 1);
+			Potion.PRAYER_ENHANCE, 1, Potion.SPLIT_OVERLOAD, 1);
 		wiki(CmRoom.VESPULA, Potion.OVERLOAD, 1, Potion.XERICS_AID, 2, Potion.REVITALISATION, 1,
 			Potion.PRAYER_ENHANCE, 1);
-		wiki(CmRoom.VASA, Potion.OVERLOAD, 1, Potion.XERICS_AID, 2, Potion.TWISTED, 2);
+		// vasa's 2 twisted are left out, they don't make a set
+		wiki(CmRoom.VASA, Potion.OVERLOAD, 1, Potion.XERICS_AID, 2);
 		wiki(CmRoom.MUTTADILE, Potion.OVERLOAD, 2, Potion.XERICS_AID, 1, Potion.REVITALISATION, 1,
 			Potion.PRAYER_ENHANCE, 2);
 	}
@@ -102,6 +103,10 @@ public final class DropPlan
 	 */
 	public synchronized boolean set(CmRoom room, Potion potion, int count)
 	{
+		if (!potion.isClaimable())
+		{
+			return false;
+		}
 		count = count == DEFAULT ? DEFAULT : Math.max(0, Math.min(MAX_COUNT, count));
 		String key = key(room, potion);
 		Entry entry = edits.get(key);
@@ -182,7 +187,12 @@ public final class DropPlan
 		String key;
 		try
 		{
-			key = key(CmRoom.valueOf(parts[0]), Potion.valueOf(parts[1]));
+			Potion potion = Potion.valueOf(parts[1]);
+			if (!potion.isClaimable())
+			{
+				return false;
+			}
+			key = key(CmRoom.valueOf(parts[0]), potion);
 			count = Integer.parseInt(parts[2]);
 			revision = Long.parseLong(parts[3]);
 		}

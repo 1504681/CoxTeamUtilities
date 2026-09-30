@@ -43,6 +43,18 @@ public class SuppliesTest
 	}
 
 	@Test
+	public void aSplitOverloadIsOnlyAsBigAsItsSmallestPart()
+	{
+		// elder (+)(4), twisted (+)(4), kodai (+)(3)
+		Supplies set = Supplies.count(new int[]{20924, 20936, 20947}, new int[]{1, 1, 1});
+		assertEquals(3, set.splitOverloadDoses());
+		// no kodai, no overload
+		assertEquals(0, Supplies.count(new int[]{20924, 20936}, new int[]{1, 1}).splitOverloadDoses());
+		assertNull(Potion.of(-1));
+		assertEquals(0, Potion.SPLIT_OVERLOAD.doses(-1));
+	}
+
+	@Test
 	public void addsUp()
 	{
 		Supplies a = Supplies.count(new int[]{20996}, new int[]{1});

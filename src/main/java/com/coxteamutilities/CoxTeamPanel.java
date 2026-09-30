@@ -364,10 +364,12 @@ class CoxTeamPanel extends PluginPanel
 			String stored = "private " + (state.privateStorage == null ? "?" : state.privateStorage.doses(potion));
 			String shared = "shared " + (state.sharedStorage == null ? "?" : state.sharedStorage.doses(potion));
 			String claimed = "claimed " + state.claimed.doses(potion);
+			String split = potion != Potion.OVERLOAD ? "" : "<br>split overload " + state.splitHeld() + " held, "
+				+ state.claimed.doses(Potion.SPLIT_OVERLOAD) + " claimed" + (state.countSplit ? "" : " (not counted)");
 			JLabel detail = detailLabels.get(potion);
 			detail.setText(inventory + "  " + stored);
 			moreLabels.get(potion).setText(shared + "  " + claimed);
-			detail.setToolTipText("<html>" + inventory + "<br>" + stored + "<br>" + shared + "<br>" + claimed
+			detail.setToolTipText("<html>" + inventory + "<br>" + stored + "<br>" + shared + "<br>" + claimed + split
 				+ "<br><br>? means the storage hasn't been opened this raid</html>");
 			label.setToolTipText(detail.getToolTipText());
 			moreLabels.get(potion).setToolTipText(detail.getToolTipText());
@@ -495,7 +497,7 @@ class CoxTeamPanel extends PluginPanel
 			{
 				listed |= drop.potion == potion;
 			}
-			if (!listed)
+			if (!listed && potion.isClaimable())
 			{
 				JMenuItem item = new JMenuItem("Add " + potion.getDisplayName());
 				item.addActionListener(e -> actions.setDropCount(room.room, potion, 1));

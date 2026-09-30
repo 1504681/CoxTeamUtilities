@@ -105,6 +105,18 @@ public interface CoxTeamUtilitiesConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "countSplit",
+		name = "Count split overloads",
+		description = "Count a set of elder, twisted and kodai towards the overload doses you need",
+		section = needSection,
+		position = 6
+	)
+	default boolean countSplit()
+	{
+		return true;
+	}
+
+	@ConfigItem(
 		keyName = "overlay",
 		name = "Missing item overlay",
 		description = "List missing role items on screen at the raid lobby and before the raid starts",

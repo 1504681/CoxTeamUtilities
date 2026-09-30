@@ -28,13 +28,15 @@ The game only sends storage contents when you open the storage unit, so both sto
 
 Every potion a room drops is a box you can click to claim. Counts start from the OSRS Wiki drop tables:
 
-| Room | Overload | Xeric's aid | Revitalisation | Prayer enhance | Other |
+| Room | Overload | Xeric's aid | Revitalisation | Prayer enhance | Split overload |
 |---|---|---|---|---|---|
 | Tekton | 2 | | 1 | 1 | |
-| Vanguards | 1 to 3 | 4 | 2 | 1 | Elder 1, Twisted 1, Kodai 1 |
+| Vanguards | 1 to 3 | 4 | 2 | 1 | 1 |
 | Vespula | 1 | 2 | 1 | 1 | |
-| Vasa | 1 | 2 | | | Twisted 2 |
+| Vasa | 1 | 2 | | | |
 | Muttadile | 2 | 1 | 1 | 2 | |
+
+A split overload is the elder, twisted and kodai that Vanguards drop, claimed as one. It counts as 4 overload doses, and so does a set you're carrying (as many doses as the smallest of the three has). Vasa's 2 twisted aren't listed.
 
 The wiki has no numbers for larger teams, so use `-` and `+` to set what your team size gets. Edited counts are kept between raids. The Vanguards overload count is random, so it goes back to 1 after each raid. Right click a room name to add a potion the table doesn't list. Claims are cleared when you leave the raid.
 
@@ -49,6 +51,7 @@ Join a party with the core Party plugin. Each member with this plugin shows up u
 | Doses needed: Overload / Xeric's aid / Revitalisation / Prayer enhance | 4 / 12 / 8 / 4 |
 | Count claimed drops towards what you need | on |
 | Count shared storage towards what you need | off |
+| Count split overloads as overload doses | on |
 | Missing item overlay | on |
 | Keep overlay during the raid | off |
 | Include party members in reminders | on |
