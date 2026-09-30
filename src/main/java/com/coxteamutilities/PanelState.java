@@ -248,7 +248,6 @@ final class PanelState
 	/** Whether you are an ironman. */
 	boolean iron;
 	boolean countShared;
-	boolean countClaimed;
 	boolean countSplit;
 
 	Supplies inventory = Supplies.EMPTY;
@@ -257,8 +256,6 @@ final class PanelState
 	Supplies sharedStorage;
 	Supplies claimed = Supplies.EMPTY;
 	final Map<Potion, Integer> need = new EnumMap<>(Potion.class);
-	/** The table being shown: the solo one when solo is set and the plans are separate. */
-	NeedPlan needs = new NeedPlan();
 	/** Whether the numbers are for a solo raid: the raid's size while in one, the tab otherwise. */
 	boolean solo;
 	boolean separateSoloNeeds;
@@ -295,19 +292,28 @@ final class PanelState
 	int have(Potion potion)
 	{
 		int have = held().doses(potion);
-		if (countClaimed)
-		{
-			have += claimed.doses(potion);
-		}
 		if (potion == Potion.OVERLOAD && countSplit)
 		{
 			have += splitHeld();
-			if (countClaimed)
-			{
-				have += claimed.doses(Potion.SPLIT_OVERLOAD);
-			}
 		}
 		return have;
+	}
+
+	/** Claims anyone in the party has made. */
+	int claimCount()
+	{
+		int count = 0;
+		for (RoomDrops room : drops)
+		{
+			for (PotionDrop drop : room.potions)
+			{
+				for (SlotView slot : drop.slots)
+				{
+					count += slot.holders.size();
+				}
+			}
+		}
+		return count;
 	}
 
 	int shortfall(Potion potion)

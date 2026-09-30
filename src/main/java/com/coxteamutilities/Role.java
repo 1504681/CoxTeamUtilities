@@ -13,13 +13,13 @@ import java.util.Set;
  */
 public enum Role
 {
-	TIGHTROPE_VENATOR(CmRoom.TIGHTROPE, "Venator bow", "Lure the rangers and magers with a Venator bow",
-		Requirement.anyItem("Venator bow (charged)", ItemIds.VENATOR_BOW, ItemIds.VENATOR_BOW_ORNAMENT)),
-	TIGHTROPE_CHINS(CmRoom.TIGHTROPE, "Chins", "Lure the rangers and magers with chinchompas",
-		Requirement.anyItem("Chinchompas", ItemIds.CHINCHOMPA, ItemIds.RED_CHINCHOMPA, ItemIds.BLACK_CHINCHOMPA)),
-	TIGHTROPE_TELEGRAB(CmRoom.TIGHTROPE, "Telegrab", "Telegrab the keystone crystal",
+	TIGHTROPE_LURER(CmRoom.TIGHTROPE, "Lurer", "Lure the rangers and magers with a Venator bow or chinchompas",
+		Requirement.anyItem("Venator bow (charged) or chinchompas", ItemIds.VENATOR_BOW, ItemIds.VENATOR_BOW_ORNAMENT,
+			ItemIds.CHINCHOMPA, ItemIds.RED_CHINCHOMPA, ItemIds.BLACK_CHINCHOMPA)),
+	TIGHTROPE_TELEGRAB(CmRoom.TIGHTROPE, "Telegrabber", "Telegrab the keystone crystal",
 		Requirement.standardSpellbook(),
 		Requirement.runes("Law rune", ItemIds.LAW_RUNE, 1)),
+	TIGHTROPE_CROSSER(CmRoom.TIGHTROPE, "Crosser", "Cross the tightrope; nothing to carry"),
 	MUTTADILE_ZGS(CmRoom.MUTTADILE, "ZGS", "Freeze the muttadile with the Zamorak godsword spec",
 		Requirement.anyItem("Zamorak godsword", ItemIds.ZAMORAK_GODSWORD, ItemIds.ZAMORAK_GODSWORD_OR)),
 	MUTTADILE_ENTANGLE(CmRoom.MUTTADILE, "Entangler", "Entangle the muttadile",

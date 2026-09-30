@@ -30,12 +30,17 @@ public class CoxTeamPanelTest
 		}
 
 		@Override
-		public void setNeed(CmRoom room, Potion potion, int doses)
+		public void setNeed(Potion potion, int doses)
 		{
 		}
 
 		@Override
 		public void setNeedsTab(boolean solo)
+		{
+		}
+
+		@Override
+		public void finishRaid()
 		{
 		}
 
@@ -70,23 +75,17 @@ public class CoxTeamPanelTest
 	{
 		PanelState state = new PanelState();
 		state.inParty = true;
-		state.countClaimed = true;
 		state.inventory = Supplies.of(new int[]{4, 8, 4, 0});
 		state.privateStorage = Supplies.of(new int[]{0, 4, 0, 4});
 		state.claimed = Supplies.of(new int[]{4, 0, 0, 0});
-		state.needs = NeedPlan.soloDefaults();
 		state.solo = true;
 		state.units = NeedUnits.POTIONS;
-		state.needs.set(CmRoom.TEKTON, Potion.OVERLOAD, 1);
-		state.needs.set(CmRoom.VANGUARDS, Potion.OVERLOAD, 1);
-		state.needs.set(CmRoom.VANGUARDS, Potion.XERICS_AID, 4);
-		state.needs.set(CmRoom.MUTTADILE, Potion.OVERLOAD, 2);
+		Needs needs = Needs.soloDefaults();
 		for (Potion potion : Potion.values())
 		{
-			state.need.put(potion, state.needs.total(potion));
+			state.need.put(potion, state.applies(potion) ? needs.get(potion) : 0);
 		}
-
-		state.roles.addAll(EnumSet.of(Role.MUTTADILE_ZGS, Role.MUTTADILE_ENTANGLE, Role.TIGHTROPE_CHINS));
+		state.roles.addAll(EnumSet.of(Role.MUTTADILE_ZGS, Role.MUTTADILE_ENTANGLE, Role.TIGHTROPE_LURER));
 		state.missing.put(Role.MUTTADILE_ENTANGLE, Arrays.asList("Standard spellbook", "Nature runes"));
 
 		PanelState.Member me = new PanelState.Member();
@@ -97,7 +96,7 @@ public class CoxTeamPanelTest
 			new LinkedHashMap<>(), Supplies.of(new int[]{4, 12, 4, 4}), false);
 		PanelState.Member bob = new PanelState.Member();
 		bob.name = "Zezima the 2nd";
-		bob.status = new MemberStatus(EnumSet.of(Role.TIGHTROPE_VENATOR, Role.TIGHTROPE_TELEGRAB),
+		bob.status = new MemberStatus(EnumSet.of(Role.TIGHTROPE_LURER, Role.TIGHTROPE_TELEGRAB),
 			Collections.emptyList(), new LinkedHashMap<>(), Supplies.of(new int[]{8, 8, 8, 8}), true);
 		bob.iron = true;
 		PanelState.Member quiet = new PanelState.Member();
@@ -188,6 +187,17 @@ public class CoxTeamPanelTest
 	@Test
 	public void drawsABusyRaidWithinTheSidebarWidth() throws Exception
 	{
+		draw(false, "build/panel.png");
+	}
+
+	@Test
+	public void drawsTheClaimsWithinTheSidebarWidth() throws Exception
+	{
+		draw(true, "build/panel-claims.png");
+	}
+
+	private static void draw(boolean claimsOpen, String file) throws Exception
+	{
 		BufferedImage[] drawn = new BufferedImage[1];
 		int[] rightEdge = new int[1];
 		SwingUtilities.invokeAndWait(() ->
@@ -202,6 +212,7 @@ public class CoxTeamPanelTest
 				label.setIcon(new ImageIcon(square));
 			});
 			panel.update(busyRaid());
+			panel.showClaims(claimsOpen);
 
 			// twice, html labels only know their height once they have a width
 			for (int pass = 0; pass < 2; pass++)
@@ -219,7 +230,7 @@ public class CoxTeamPanelTest
 			rightEdge[0] = deepestRightEdge(panel, -panel.getX());
 		});
 
-		File out = new File("build/panel.png");
+		File out = new File(file);
 		out.getParentFile().mkdirs();
 		ImageIO.write(drawn[0], "png", out);
 

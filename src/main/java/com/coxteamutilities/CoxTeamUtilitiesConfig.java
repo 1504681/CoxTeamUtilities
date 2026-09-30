@@ -45,25 +45,13 @@ public interface CoxTeamUtilitiesConfig extends Config
 	@ConfigItem(
 		keyName = "separateSoloNeeds",
 		name = "Separate doses for solo raids",
-		description = "Keep a second doses-needed table for solo raids. Off means solos use the team numbers",
+		description = "Keep separate doses for solo raids. Off means solos use the team numbers",
 		section = needSection,
 		position = 1
 	)
 	default boolean separateSoloNeeds()
 	{
 		return false;
-	}
-
-	@ConfigItem(
-		keyName = "countClaimed",
-		name = "Count claimed drops",
-		description = "Count the drops you've claimed towards the doses you need",
-		section = needSection,
-		position = 4
-	)
-	default boolean countClaimed()
-	{
-		return true;
 	}
 
 	@ConfigItem(
@@ -176,7 +164,7 @@ public interface CoxTeamUtilitiesConfig extends Config
 	@ConfigItem(
 		keyName = KEY_NEEDS,
 		name = "Doses needed",
-		description = "Doses needed per room, edited in the sidebar",
+		description = "Doses needed for Olm, edited in the sidebar",
 		hidden = true
 	)
 	default String needs()
@@ -187,7 +175,7 @@ public interface CoxTeamUtilitiesConfig extends Config
 	@ConfigItem(
 		keyName = KEY_NEEDS_SOLO,
 		name = "Doses needed, solo",
-		description = "Doses needed per room in a solo raid, edited in the sidebar",
+		description = "Doses needed for Olm in a solo raid, edited in the sidebar",
 		hidden = true
 	)
 	default String needsSolo()
@@ -198,7 +186,7 @@ public interface CoxTeamUtilitiesConfig extends Config
 	@ConfigItem(
 		keyName = KEY_NEEDS_TAB_SOLO,
 		name = "Solo tab",
-		description = "Which doses-needed table the sidebar shows outside a raid",
+		description = "Whether the sidebar shows the solo doses outside a raid",
 		hidden = true
 	)
 	default boolean needsTabSolo()

@@ -23,20 +23,25 @@ public class RoleTest
 	}
 
 	@Test
-	public void anyChinchompaWorks()
+	public void anyChinchompaOrVenatorBowLures()
 	{
-		for (int id : new int[]{10033, 10034, 11959})
+		for (int id : new int[]{10033, 10034, 11959, 27610, 30434})
 		{
-			assertTrue(Role.TIGHTROPE_CHINS.missing(new Loadout().add(id, 50)).isEmpty());
+			assertTrue(Role.TIGHTROPE_LURER.missing(new Loadout().add(id, 1)).isEmpty());
 		}
-		assertFalse(Role.TIGHTROPE_CHINS.missing(new Loadout().add(ItemIds.VENATOR_BOW, 1)).isEmpty());
+		assertFalse(Role.TIGHTROPE_LURER.missing(new Loadout()).isEmpty());
 	}
 
 	@Test
 	public void unchargedVenatorBowDoesNotCount()
 	{
-		assertFalse(Role.TIGHTROPE_VENATOR.missing(new Loadout().add(27612, 1)).isEmpty());
-		assertTrue(Role.TIGHTROPE_VENATOR.missing(new Loadout().add(27610, 1)).isEmpty());
+		assertFalse(Role.TIGHTROPE_LURER.missing(new Loadout().add(27612, 1)).isEmpty());
+	}
+
+	@Test
+	public void crossingNeedsNothing()
+	{
+		assertTrue(Role.TIGHTROPE_CROSSER.missing(new Loadout()).isEmpty());
 	}
 
 	@Test
@@ -61,7 +66,7 @@ public class RoleTest
 	public void onlySelectedRolesAreChecked()
 	{
 		Map<Role, List<String>> missing = CoxTeamUtilitiesPlugin.missingFor(
-			EnumSet.of(Role.MUTTADILE_ZGS, Role.TIGHTROPE_CHINS), new Loadout().add(ItemIds.BLACK_CHINCHOMPA, 1));
+			EnumSet.of(Role.MUTTADILE_ZGS, Role.TIGHTROPE_LURER), new Loadout().add(ItemIds.BLACK_CHINCHOMPA, 1));
 		assertEquals(Collections.singleton(Role.MUTTADILE_ZGS), missing.keySet());
 	}
 
@@ -70,8 +75,8 @@ public class RoleTest
 	{
 		assertEquals(EnumSet.of(Role.MUTTADILE_ZGS),
 			Role.parse(Arrays.asList("MUTTADILE_ZGS", "OLM_SOMETHING_NEW", "", null)));
-		assertEquals(Arrays.asList("TIGHTROPE_CHINS", "MUTTADILE_ZGS"),
-			Role.names(EnumSet.of(Role.MUTTADILE_ZGS, Role.TIGHTROPE_CHINS)));
+		assertEquals(Arrays.asList("TIGHTROPE_LURER", "MUTTADILE_ZGS"),
+			Role.names(EnumSet.of(Role.MUTTADILE_ZGS, Role.TIGHTROPE_LURER)));
 	}
 
 	@Test

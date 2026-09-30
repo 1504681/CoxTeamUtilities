@@ -8,9 +8,9 @@ Tick the roles you're doing. You can tick more than one.
 
 | Room | Role | Checked |
 |---|---|---|
-| Tightrope | Venator bow | charged Venator bow |
-| Tightrope | Chins | grey, red or black chinchompas |
-| Tightrope | Telegrab | standard spellbook, 1 law rune |
+| Tightrope | Lurer | charged Venator bow, or grey, red or black chinchompas |
+| Tightrope | Telegrabber | standard spellbook, 1 law rune |
+| Tightrope | Crosser | nothing |
 | Muttadile | ZGS | Zamorak godsword |
 | Muttadile | Entangler | standard spellbook, 4 nature runes |
 
@@ -20,13 +20,44 @@ If something is missing the role turns red in the sidebar, an overlay lists it a
 
 ## Supplies
 
-Overload, Xeric's aid, Revitalisation and Prayer enhance, split into inventory, private storage, shared storage and claimed drops, shown as doses or as potions (setting). The `need` number is the sum of the **Needed per room** table underneath: type how much you drink at each room and the row shows how much you're short. Hover a room name to see what you still have to drink from that room on.
+Overload, Xeric's aid, Revitalisation and Prayer enhance in your inventory and private storage (shared storage too if the setting is on), shown as doses or as potions (setting), against the `need` number you type next to each: what you want to have when you get to Olm. Short rows go red with how much more to pick up. Claims don't count until the potion is actually in your inventory.
 
-The table has a **Team** and a **Solo** tab. Solo adds a Stamina column for the running at Olm. Both tabs share the same numbers unless *Separate doses for solo raids* is on. Inside a raid the plugin picks the tab from the raid's party size. Defaults, all at Olm: team 1 Overload, 6 Xeric's aid, 3 Revitalisation, 1 Prayer enhance; solo the same with 4 Revitalisation and 1 Stamina.
+**Team** and **Solo** at the top switch between two sets of `need` numbers; Solo adds a Stamina row for the running at Olm. Both use the same numbers unless *Separate doses for solo raids* is on. Inside a raid the plugin picks team or solo from the raid's party size. Defaults: team 1 Overload, 6 Xeric's aid, 3 Revitalisation, 1 Prayer enhance; solo the same with 4 Revitalisation and 1 Stamina.
 
 When you walk into Olm you get a chat line with whatever you're still short.
 
 The game only sends storage contents when you open the storage unit, so both storages show `?` until you've opened them in the current raid.
+
+## Claims
+
+Folded away under the Team section until you open it; the header shows how many claims the party has made. Every potion a room drops is a box you can click to claim. Click takes all 4 doses, or whatever the others left. Click again to drop the claim.
+
+To share a potion, right click its box:
+
+- `Take 1 dose` to `Take 4 doses` sets how many doses are yours.
+- `Sip at` ticks the rooms you sip at, from the room that drops it up to Olm. One more room than doses takes one more dose if there is one.
+
+Under the boxes each shared potion lists who holds it in order: `#1 You: 2 doses (Tekton, Vanguards), then drop for Bob`, then `Bob: pick up, 2 doses (Vespula, Vasa)`. Whoever sips at the earliest room holds it first. Without rooms it's whoever claimed first.
+
+Ironmen can't pick up a potion someone else has held, so an ironman always holds it first and then drops it for the others. An ironman can claim doses of a potion others have already claimed: a click takes one sip in front of them, and their claims shrink to what's left. Only one ironman can be on a potion. The plugin reads the account type from the game, there's nothing to set. A blue box has doses left: click it to be the one who picks it up. This is a plan everyone can see, the plugin doesn't watch who drinks or drops.
+
+Counts start from the OSRS Wiki drop tables:
+
+| Room | Overload | Xeric's aid | Revitalisation | Prayer enhance | Split overload |
+|---|---|---|---|---|---|
+| Tekton | 2 | | 1 | 1 | |
+| Vanguards | 1 to 3 | 4 | 2 | 1 | 1 |
+| Vespula | 1 | 2 | 1 | 1 | |
+| Vasa | 1 | 2 | | | |
+| Muttadile | 2 | 1 | 1 | 2 | |
+
+A split overload is the elder, twisted and kodai that Vanguards drop, claimed as one. A set you're carrying counts as overload doses (as many as the smallest of the three has). Vasa's 2 twisted aren't listed.
+
+The wiki has no numbers for larger teams, so use `-` and `+` to set what your team size gets. Edited counts are kept between raids. The Vanguards overload count is random, so it goes back to 1 after each raid. Right click a room name to add a potion the table doesn't list. Claims are cleared when you leave the raid.
+
+## Party
+
+Join a party with the core Party plugin. Each member with this plugin shows up under Team with their roles, missing items and doses carried. Claims and drop count edits are shared.
 
 ## Settings
 
@@ -34,7 +65,6 @@ The game only sends storage contents when you open the storage unit, so both sto
 |---|---|
 | Show supplies as | doses |
 | Separate doses for solo raids | off |
-| Count claimed drops towards what you need | on |
 | Count shared storage towards what you need | off |
 | Count split overloads as overload doses | on |
 | Missing item overlay | on |
@@ -43,6 +73,10 @@ The game only sends storage contents when you open the storage unit, so both sto
 | Chat message on entry | on |
 | Olm entry reminder | on |
 | Notify on entry | off |
+
+## TYFR
+
+The button at the bottom drops all your claims and all your roles, for when the raid is over.
 
 ## Changelog
 

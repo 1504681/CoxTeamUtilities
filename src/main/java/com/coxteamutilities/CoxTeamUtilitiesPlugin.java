@@ -122,9 +122,9 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	private NavigationButton navigationButton;
 
 	private final DropPlan plan = new DropPlan();
-	private volatile NeedPlan needs = NeedPlan.defaults();
-	private volatile NeedPlan needsSolo = NeedPlan.soloDefaults();
-	/** Which table the sidebar shows and edits outside a raid. */
+	private volatile Needs needs = Needs.defaults();
+	private volatile Needs needsSolo = Needs.soloDefaults();
+	/** Whether the sidebar shows and edits the solo doses outside a raid. */
 	private volatile boolean needsTabSolo;
 
 	/** Guards everything below that the Swing, client and party threads share. */
@@ -166,8 +166,8 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			roles.addAll(Role.parse(split(config.roles())));
 		}
 		plan.merge(split(config.plan()));
-		needs = NeedPlan.parse(config.needs(), NeedPlan.defaults());
-		needsSolo = NeedPlan.parse(config.needsSolo(), NeedPlan.soloDefaults());
+		needs = Needs.parse(config.needs(), Needs.defaults());
+		needsSolo = Needs.parse(config.needsSolo(), Needs.soloDefaults());
 		needsTabSolo = config.needsTabSolo();
 
 		panel = new CoxTeamPanel(this, (label, itemId) -> itemManager.getImage(itemId).addTo(label));
@@ -397,8 +397,8 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		return inRaid ? soloRaid : needsTabSolo;
 	}
 
-	/** The table for the solo tab, or for solo raids, when the plans are kept apart. */
-	private NeedPlan needsFor(boolean solo)
+	/** The solo doses for the solo tab, or a solo raid, when they are kept apart. */
+	private Needs needsFor(boolean solo)
 	{
 		return solo && config.separateSoloNeeds() ? needsSolo : needs;
 	}
@@ -717,6 +717,24 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			stored = String.join(",", Role.names(roles));
 		}
 		configManager.setConfiguration(CoxTeamUtilitiesConfig.GROUP, CoxTeamUtilitiesConfig.KEY_ROLES, stored);
+		rolesChanged();
+	}
+
+	@Override
+	public void finishRaid()
+	{
+		synchronized (lock)
+		{
+			roles.clear();
+			claims.clear();
+		}
+		configManager.setConfiguration(CoxTeamUtilitiesConfig.GROUP, CoxTeamUtilitiesConfig.KEY_ROLES, "");
+		rolesChanged();
+	}
+
+	/** Re-checks the items for the roles on the next tick, or right away when no tick is coming. */
+	private void rolesChanged()
+	{
 		loadoutDirty = true;
 		if (client.getGameState() != GameState.LOGGED_IN)
 		{
@@ -731,10 +749,10 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	}
 
 	@Override
-	public void setNeed(CmRoom room, Potion potion, int doses)
+	public void setNeed(Potion potion, int doses)
 	{
-		NeedPlan plan = needsFor(needsTabSolo);
-		if (plan.set(room, potion, doses))
+		Needs plan = needsFor(needsTabSolo);
+		if (plan.set(potion, doses))
 		{
 			configManager.setConfiguration(CoxTeamUtilitiesConfig.GROUP,
 				plan == needsSolo ? CoxTeamUtilitiesConfig.KEY_NEEDS_SOLO : CoxTeamUtilitiesConfig.KEY_NEEDS, plan.encode());
@@ -893,15 +911,14 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		state.inParty = party.isInParty();
 		state.iron = iron;
 		state.countShared = config.countShared();
-		state.countClaimed = config.countClaimed();
 		state.countSplit = config.countSplit();
 		state.units = config.needUnits();
 		state.separateSoloNeeds = config.separateSoloNeeds();
 		state.solo = solo();
-		state.needs = needsFor(state.solo).copy();
+		Needs needs = needsFor(state.solo);
 		for (Potion potion : Potion.values())
 		{
-			state.need.put(potion, state.applies(potion) ? state.needs.total(potion) : 0);
+			state.need.put(potion, state.applies(potion) ? needs.get(potion) : 0);
 		}
 
 		PartyMember local = party.getLocalMember();

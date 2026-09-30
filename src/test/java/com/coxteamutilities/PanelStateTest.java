@@ -26,17 +26,15 @@ public class PanelStateTest
 	}
 
 	@Test
-	public void sharedAndClaimedOnlyCountWhenAsked()
+	public void sharedOnlyCountsWhenAskedAndClaimsNever()
 	{
 		PanelState state = new PanelState();
 		state.need.put(Potion.OVERLOAD, 12);
 		state.sharedStorage = overloads(8);
 		state.claimed = overloads(4);
 		assertEquals(12, state.shortfall(Potion.OVERLOAD));
-		state.countClaimed = true;
-		assertEquals(8, state.shortfall(Potion.OVERLOAD));
 		state.countShared = true;
-		assertEquals(0, state.shortfall(Potion.OVERLOAD));
+		assertEquals(4, state.shortfall(Potion.OVERLOAD));
 	}
 
 	@Test
@@ -44,18 +42,13 @@ public class PanelStateTest
 	{
 		PanelState state = new PanelState();
 		state.need.put(Potion.OVERLOAD, 12);
-		state.countClaimed = true;
 		state.countSplit = true;
 		state.inventory = overloads(4);
 		// elder in the inventory, twisted and kodai in private storage
 		state.inventory = state.inventory.plus(Supplies.count(new int[]{20924}, new int[]{1}));
 		state.privateStorage = Supplies.count(new int[]{20936, 20948}, new int[]{1, 1});
 		assertEquals(8, state.have(Potion.OVERLOAD));
-
-		int[] claimed = new int[Potion.values().length];
-		claimed[Potion.SPLIT_OVERLOAD.ordinal()] = 4;
-		state.claimed = Supplies.of(claimed);
-		assertEquals(0, state.shortfall(Potion.OVERLOAD));
+		assertEquals(4, state.shortfall(Potion.OVERLOAD));
 
 		state.countSplit = false;
 		assertEquals(4, state.have(Potion.OVERLOAD));

@@ -39,10 +39,13 @@ class CoxTeamPanel extends PluginPanel
 	{
 		void setRole(Role role, boolean selected);
 
-		void setNeed(CmRoom room, Potion potion, int doses);
+		void setNeed(Potion potion, int doses);
 
-		/** Switches the doses-needed table between the team and the solo numbers. */
+		/** Switches the doses needed between the team and the solo numbers. */
 		void setNeedsTab(boolean solo);
+
+		/** Thanks for the raid: drops every claim and role you have. */
+		void finishRaid();
 
 		void setDropCount(CmRoom room, Potion potion, int count);
 
@@ -117,16 +120,14 @@ class CoxTeamPanel extends PluginPanel
 	private final Map<Potion, JLabel> haveLabels = new EnumMap<>(Potion.class);
 	private final Map<Potion, JLabel> detailLabels = new EnumMap<>(Potion.class);
 	private final Map<Potion, JLabel> moreLabels = new EnumMap<>(Potion.class);
-	private final Map<Potion, JLabel> needLabels = new EnumMap<>(Potion.class);
-	private final Map<CmRoom, Map<Potion, JTextField>> needFields = new EnumMap<>(CmRoom.class);
-	private final Map<CmRoom, JLabel> roomLabels = new EnumMap<>(CmRoom.class);
+	private final Map<Potion, JTextField> needFields = new EnumMap<>(Potion.class);
 	private final Map<Potion, JComponent> supplyRows = new EnumMap<>(Potion.class);
-	private final Map<Potion, JLabel> needHeads = new EnumMap<>(Potion.class);
 	private final JLabel teamTab = small("Team", Color.WHITE);
 	private final JLabel soloTab = small("Solo", MUTED);
 	private NeedUnits units = NeedUnits.DOSES;
-	private final JPanel needsBody = new JPanel();
-	private final JLabel needsToggle = small("", MUTED);
+	private final JLabel claimCount = small("", GOOD);
+	private final JLabel claimsToggle = small("show", MUTED);
+	private final JPanel claimsSection = new JPanel(new BorderLayout());
 	private final Map<Role, JCheckBox> roleBoxes = new EnumMap<>(Role.class);
 	private final Map<Role, JLabel> roleMissing = new EnumMap<>(Role.class);
 	private final Stack teamBody = new Stack(ColorScheme.DARKER_GRAY_COLOR);
@@ -145,15 +146,21 @@ class CoxTeamPanel extends PluginPanel
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
 
 		Stack content = new Stack(null);
-		content.addRow(header("Supplies", null), 0);
+		content.addRow(header("Supplies", needsTabs()), 0);
 		content.addRow(buildSupplies(), 4);
 		content.addRow(header("Roles", null), 12);
 		content.addRow(buildRoles(), 4);
 		content.addRow(header("Team", null), 12);
 		content.addRow(padded(teamBody), 4);
-		content.addRow(header("Drops", chip("Reset", ColorScheme.DARKER_GRAY_COLOR,
-			"Put every drop count back to the wiki's", actions::resetDropCounts)), 12);
-		content.addRow(padded(dropsBody), 4);
+		content.addRow(claimsHeader(), 12);
+		claimsSection.setOpaque(false);
+		claimsSection.add(padded(dropsBody), BorderLayout.CENTER);
+		claimsSection.setVisible(false);
+		content.addRow(claimsSection, 4);
+		JLabel tyfr = chip("TYFR", ColorScheme.DARKER_GRAY_COLOR,
+			"Thanks for the raid: drops all your claims and all your roles", actions::finishRaid);
+		tyfr.setBorder(new EmptyBorder(6, 6, 6, 6));
+		content.addRow(tyfr, 12);
 		add(content, BorderLayout.NORTH);
 
 		update(new PanelState());
@@ -260,14 +267,25 @@ class CoxTeamPanel extends PluginPanel
 			text.add(detail);
 			text.add(more);
 
-			JLabel need = new JLabel("0", SwingConstants.CENTER);
-			need.setFont(FontManager.getRunescapeBoldFont());
-			need.setForeground(Color.WHITE);
-			need.setToolTipText(potion.getDisplayName() + " you want over the raid, from the rooms below");
-			needLabels.put(potion, need);
+			JTextField need = new JTextField("0");
+			need.setFont(FontManager.getRunescapeSmallFont());
+			need.setHorizontalAlignment(SwingConstants.CENTER);
+			need.setMargin(new Insets(1, 1, 1, 1));
+			need.setToolTipText(potion.getDisplayName() + " you want to have when you get to Olm");
+			Runnable commit = () -> actions.setNeed(potion, units.parse(need.getText()));
+			need.addActionListener(e -> commit.run());
+			need.addFocusListener(new FocusAdapter()
+			{
+				@Override
+				public void focusLost(FocusEvent e)
+				{
+					commit.run();
+				}
+			});
+			needFields.put(potion, need);
 			JPanel needHolder = new JPanel(new BorderLayout());
 			needHolder.setOpaque(false);
-			needHolder.setPreferredSize(new Dimension(34, 32));
+			needHolder.setPreferredSize(new Dimension(36, 36));
 			needHolder.add(small("need", MUTED), BorderLayout.NORTH);
 			needHolder.add(need, BorderLayout.CENTER);
 
@@ -280,19 +298,14 @@ class CoxTeamPanel extends PluginPanel
 			body.addRow(row, first ? 0 : 6);
 			first = false;
 		}
-		body.addRow(buildNeeds(), 8);
 		return body;
 	}
 
-	/** A row per room with a field per potion, under a header that folds it away. */
-	private JPanel buildNeeds()
+	/** Team | Solo, which set of "need" numbers is shown and edited. */
+	private JPanel needsTabs()
 	{
-		JPanel header = new JPanel(new BorderLayout());
-		header.setOpaque(false);
-		JLabel title = small("Needed per room", Color.WHITE);
-		header.add(title, BorderLayout.WEST);
-		JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
-		right.setOpaque(false);
+		JPanel tabs = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+		tabs.setOpaque(false);
 		for (JLabel tab : new JLabel[]{teamTab, soloTab})
 		{
 			tab.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -304,96 +317,43 @@ class CoxTeamPanel extends PluginPanel
 					actions.setNeedsTab(tab == soloTab);
 				}
 			});
-			right.add(tab);
+			tabs.add(tab);
 		}
-		right.add(needsToggle);
-		header.add(right, BorderLayout.EAST);
-		title.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		title.setToolTipText("What you drink where. The totals are what the rows above compare against.");
-		needsToggle.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		return tabs;
+	}
+
+	/** "Claims", how many the party has made, and the fold that starts closed. */
+	private JPanel claimsHeader()
+	{
+		JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+		right.setOpaque(false);
+		right.add(claimCount);
+		right.add(chip("Reset", ColorScheme.DARKER_GRAY_COLOR, "Put every drop count back to the wiki's",
+			actions::resetDropCounts));
+		right.add(claimsToggle);
+		JPanel header = header("Claims", right);
+		header.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		header.setToolTipText("What each room drops, who takes what, and how it gets passed on");
 		MouseAdapter fold = new MouseAdapter()
 		{
 			@Override
 			public void mousePressed(MouseEvent e)
 			{
-				needsBody.setVisible(!needsBody.isVisible());
-				needsToggle.setText(needsBody.isVisible() ? "hide" : "show");
-				revalidate();
-				repaint();
+				showClaims(!claimsSection.isVisible());
 			}
 		};
-		title.addMouseListener(fold);
-		needsToggle.addMouseListener(fold);
-		needsToggle.setText("hide");
+		header.addMouseListener(fold);
+		claimsToggle.addMouseListener(fold);
+		claimCount.addMouseListener(fold);
+		return header;
+	}
 
-		needsBody.setLayout(new GridBagLayout());
-		needsBody.setOpaque(false);
-		GridBagConstraints c = new GridBagConstraints();
-		c.gridy = 0;
-		c.insets = new Insets(1, 0, 1, 2);
-		c.anchor = GridBagConstraints.WEST;
-		c.fill = GridBagConstraints.HORIZONTAL;
-		c.gridx = 0;
-		c.weightx = 1;
-		needsBody.add(small("", MUTED), c);
-		c.weightx = 0;
-		for (Potion potion : Potion.values())
-		{
-			if (potion.isSupply())
-			{
-				c.gridx++;
-				JLabel head = small(potion.getShortName(), MUTED);
-				head.setHorizontalAlignment(SwingConstants.CENTER);
-				head.setToolTipText(potion.getDisplayName());
-				needHeads.put(potion, head);
-				needsBody.add(head, c);
-			}
-		}
-		for (CmRoom room : CmRoom.values())
-		{
-			c.gridy++;
-			c.gridx = 0;
-			c.weightx = 1;
-			JLabel label = small(room.getShortName(), Color.WHITE);
-			roomLabels.put(room, label);
-			needsBody.add(label, c);
-			c.weightx = 0;
-			Map<Potion, JTextField> fields = new EnumMap<>(Potion.class);
-			for (Potion potion : Potion.values())
-			{
-				if (!potion.isSupply())
-				{
-					continue;
-				}
-				c.gridx++;
-				JTextField field = new JTextField("0");
-				field.setFont(FontManager.getRunescapeSmallFont());
-				field.setPreferredSize(new Dimension(29, 19));
-				field.setMinimumSize(field.getPreferredSize());
-				field.setHorizontalAlignment(SwingConstants.CENTER);
-				field.setMargin(new Insets(1, 1, 1, 1));
-				field.setToolTipText(potion.getDisplayName() + " to drink at " + room.getDisplayName());
-				Runnable commit = () -> actions.setNeed(room, potion, units.parse(field.getText()));
-				field.addActionListener(e -> commit.run());
-				field.addFocusListener(new FocusAdapter()
-				{
-					@Override
-					public void focusLost(FocusEvent e)
-					{
-						commit.run();
-					}
-				});
-				fields.put(potion, field);
-				needsBody.add(field, c);
-			}
-			needFields.put(room, fields);
-		}
-
-		JPanel needs = new JPanel(new BorderLayout(0, 4));
-		needs.setOpaque(false);
-		needs.add(header, BorderLayout.NORTH);
-		needs.add(needsBody, BorderLayout.CENTER);
-		return needs;
+	void showClaims(boolean open)
+	{
+		claimsSection.setVisible(open);
+		claimsToggle.setText(open ? "hide" : "show");
+		revalidate();
+		repaint();
 	}
 
 	private JPanel buildRoles()
@@ -453,6 +413,9 @@ class CoxTeamPanel extends PluginPanel
 				teamSignature = team;
 				rebuildTeam(state);
 			}
+			int claims = state.claimCount();
+			claimCount.setText(claims == 0 ? "" : claims + " claimed");
+			claimCount.setToolTipText(claims == 0 ? null : "Claims made by you and your party. Click to see them");
 			String drops = state.dropsSignature();
 			if (!drops.equals(dropsSignature))
 			{
@@ -491,25 +454,29 @@ class CoxTeamPanel extends PluginPanel
 			}
 			else
 			{
-				label.setText(units.format(have) + " / " + units.format(need) + ", short " + units.format(shortfall));
+				label.setText(units.format(have) + " / " + units.format(need) + ", " + units.format(shortfall) + " more");
 				label.setForeground(BAD);
 			}
 
 			String inventory = "inv " + units.format(state.inventory.doses(potion));
 			String stored = "private " + (state.privateStorage == null ? "?" : units.format(state.privateStorage.doses(potion)));
 			String shared = "shared " + (state.sharedStorage == null ? "?" : units.format(state.sharedStorage.doses(potion)));
-			String claimed = "claimed " + units.format(state.claimed.doses(potion));
-			String split = potion != Potion.OVERLOAD ? "" : "<br>split overload " + units.format(state.splitHeld()) + " held, "
-				+ units.format(state.claimed.doses(Potion.SPLIT_OVERLOAD)) + " claimed" + (state.countSplit ? "" : " (not counted)");
+			String split = potion != Potion.OVERLOAD ? "" : "<br>split overload " + units.format(state.splitHeld()) + " held"
+				+ (state.countSplit ? "" : " (not counted)");
 			JLabel detail = detailLabels.get(potion);
 			detail.setText(inventory + "  " + stored);
-			moreLabels.get(potion).setText(shared + "  " + claimed);
-			detail.setToolTipText("<html>" + inventory + "<br>" + stored + "<br>" + shared + "<br>" + claimed + split
+			moreLabels.get(potion).setText(shared + (state.countShared ? "" : " (not counted)"));
+			detail.setToolTipText("<html>" + inventory + "<br>" + stored + "<br>" + shared + split
 				+ "<br><br>? means the storage hasn't been opened this raid</html>");
 			label.setToolTipText(detail.getToolTipText());
 			moreLabels.get(potion).setToolTipText(detail.getToolTipText());
 
-			needLabels.get(potion).setText(units.format(need));
+			JTextField field = needFields.get(potion);
+			String value = units.format(need);
+			if (!field.hasFocus() && !field.getText().equals(value))
+			{
+				field.setText(value);
+			}
 		}
 		updateNeeds(state);
 	}
@@ -519,34 +486,8 @@ class CoxTeamPanel extends PluginPanel
 		teamTab.setForeground(state.solo ? MUTED : Color.WHITE);
 		soloTab.setForeground(state.solo ? Color.WHITE : MUTED);
 		String same = state.separateSoloNeeds ? "" : "<br>Same numbers for both until 'Separate doses for solo raids' is on in the settings";
-		teamTab.setToolTipText("<html>What you need in a team raid" + same + "</html>");
-		soloTab.setToolTipText("<html>What you need in a solo raid, stamina included" + same + "</html>");
-		for (Map.Entry<Potion, JLabel> head : needHeads.entrySet())
-		{
-			head.getValue().setVisible(state.applies(head.getKey()));
-		}
-		for (Map.Entry<CmRoom, Map<Potion, JTextField>> room : needFields.entrySet())
-		{
-			StringBuilder fromHere = new StringBuilder("<html>From " + room.getKey().getDisplayName()
-				+ " on you still drink (" + units.getWord() + "):");
-			for (Map.Entry<Potion, JTextField> e : room.getValue().entrySet())
-			{
-				JTextField field = e.getValue();
-				field.setVisible(state.applies(e.getKey()));
-				String value = units.format(state.needs.get(room.getKey(), e.getKey()));
-				if (!field.hasFocus() && !field.getText().equals(value))
-				{
-					field.setText(value);
-				}
-				if (!field.isVisible())
-				{
-					continue;
-				}
-				fromHere.append("<br>").append(e.getKey().getDisplayName()).append(' ')
-					.append(units.format(state.needs.fromRoomOn(room.getKey(), e.getKey())));
-			}
-			roomLabels.get(room.getKey()).setToolTipText(fromHere.append("</html>").toString());
-		}
+		teamTab.setToolTipText("<html>What you need for Olm in a team raid" + same + "</html>");
+		soloTab.setToolTipText("<html>What you need for Olm in a solo raid, stamina included" + same + "</html>");
 	}
 
 	private void updateRoles(PanelState state)
