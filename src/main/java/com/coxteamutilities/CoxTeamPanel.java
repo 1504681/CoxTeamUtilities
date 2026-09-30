@@ -58,8 +58,11 @@ class CoxTeamPanel extends PluginPanel
 		/** Replaces a chest's deposit (true) or withdraw (false) list with the lines of the text. */
 		void setChestLines(String key, boolean deposit, String text);
 
-		/** Replaces a chest's list with what's in the inventory right now, in slot order. */
-		void fillChestFromInventory(String key, boolean deposit);
+		/** Makes what happened at the last visit to the chest its plan. */
+		void useLastVisit(String key);
+
+		/** Whether every visit to a chest rewrites its plan. */
+		void setRecordVisits(boolean record);
 
 		void deleteChest(String key);
 
@@ -149,10 +152,13 @@ class CoxTeamPanel extends PluginPanel
 	private final JTextArea chestDeposit = new JTextArea(2, 10);
 	private final JTextArea chestWithdraw = new JTextArea(3, 10);
 	private final Stack chestSteps = new Stack(null);
+	private String selectedChest;
 	private final JLabel chestHere = small("", MUTED);
+	private final JCheckBox chestRecord = new JCheckBox("Record visits");
+	private final JLabel chestVisit = wrapped("", MUTED);
+	private JLabel chestUseVisit;
 	private final JPanel chestEditor = new JPanel(new BorderLayout());
 	private final List<String> chestKeys = new ArrayList<>();
-	private String selectedChest;
 	private String lastCurrentChest;
 	private final JLabel claimCount = small("", GOOD);
 	private final JLabel claimsToggle = small("show", MUTED);
@@ -434,6 +440,19 @@ class CoxTeamPanel extends PluginPanel
 	{
 		chestsBody.setBorder(new EmptyBorder(6, 6, 6, 6));
 		chestsBody.addRow(chestHere, 0);
+		chestRecord.setOpaque(false);
+		chestRecord.setFont(FontManager.getRunescapeSmallFont());
+		chestRecord.setForeground(Color.WHITE);
+		chestRecord.setToolTipText("<html>Each time you close a storage, what you put in and took out becomes that chest's plan."
+			+ "<br>Do a raid the way you want it once, then turn this off.</html>");
+		chestRecord.addActionListener(e ->
+		{
+			if (!updating)
+			{
+				actions.setRecordVisits(chestRecord.isSelected());
+			}
+		});
+		chestsBody.addRow(chestRecord, 2);
 
 		chestChooser.setFont(FontManager.getRunescapeSmallFont());
 		chestChooser.setPreferredSize(new Dimension(100, 24));
@@ -467,31 +486,28 @@ class CoxTeamPanel extends PluginPanel
 		editor.addRow(chestChooser, 0);
 		editor.addRow(chestName, 4);
 		editor.addRow(chestOrdered, 4);
-		editor.addRow(listHeader("Put in", true), 6);
+		editor.addRow(small("Put in", Color.WHITE), 6);
 		editor.addRow(listArea(chestDeposit, true), 2);
-		editor.addRow(listHeader("Take out", false), 6);
+		editor.addRow(small("Take out", Color.WHITE), 6);
 		editor.addRow(listArea(chestWithdraw, false), 2);
+		chestUseVisit = chip("Use last visit", ColorScheme.DARK_GRAY_COLOR,
+			"Make what you put in and took out last time this chest's plan", () ->
+			{
+				if (selectedChest != null)
+				{
+					actions.useLastVisit(selectedChest);
+				}
+			});
+		JPanel visitRow = new JPanel(new BorderLayout(4, 0));
+		visitRow.setOpaque(false);
+		visitRow.add(chestVisit, BorderLayout.CENTER);
+		visitRow.add(chestUseVisit, BorderLayout.EAST);
+		editor.addRow(visitRow, 6);
 		editor.addRow(chestSteps, 6);
 		chestEditor.setOpaque(false);
 		chestEditor.add(editor, BorderLayout.CENTER);
 		chestsBody.addRow(chestEditor, 4);
 		return chestsBody;
-	}
-
-	private JPanel listHeader(String title, boolean deposit)
-	{
-		JPanel header = new JPanel(new BorderLayout());
-		header.setOpaque(false);
-		header.add(small(title, Color.WHITE), BorderLayout.WEST);
-		header.add(chip("\u2190 inventory", ColorScheme.DARK_GRAY_COLOR,
-			"Replace the list with what's in your inventory now, in slot order", () ->
-			{
-				if (selectedChest != null)
-				{
-					actions.fillChestFromInventory(selectedChest, deposit);
-				}
-			}), BorderLayout.EAST);
-		return header;
 	}
 
 	private JTextArea listArea(JTextArea area, boolean deposit)
@@ -501,7 +517,8 @@ class CoxTeamPanel extends PluginPanel
 		area.setWrapStyleWord(true);
 		area.setMargin(new Insets(3, 3, 3, 3));
 		area.setToolTipText("<html>One item per line, matched from the start of its name, so 'Xeric's aid' is any dose."
-			+ "<br>'Stinkhorn mushroom x3' for a number" + (deposit ? ", 'everything' to empty the inventory" : "") + ".</html>");
+			+ "<br>* and ? are wildcards: '*chinchompa', 'Dragon *'. 'Stinkhorn mushroom x3' for a number"
+			+ (deposit ? ", 'everything' to empty the inventory" : "") + ".</html>");
 		area.addFocusListener(new FocusAdapter()
 		{
 			@Override
@@ -551,6 +568,7 @@ class CoxTeamPanel extends PluginPanel
 			chestChooser.addItem(plan.getName().isEmpty() ? plan.getKey() : plan.getName());
 		}
 		chestEditor.setVisible(!plans.isEmpty());
+		chestRecord.setSelected(state.recordVisits);
 		if (plans.isEmpty())
 		{
 			chestHere.setText("<html>Open a storage unit in a raid and it shows up here, with a list of what to put in and take out.</html>");
@@ -584,6 +602,11 @@ class CoxTeamPanel extends PluginPanel
 		chestOrdered.setSelected(plan.isOrdered());
 		setIfIdle(chestDeposit, String.join("\n", plan.getDeposit()));
 		setIfIdle(chestWithdraw, String.join("\n", plan.getWithdraw()));
+		ChestPlan.Visit visit = state.visits.get(plan.getKey());
+		chestVisit.setText(visit == null ? "No visit yet this session" : "<html><body style='width:100px'>Last visit: in "
+			+ escape(visit.putIn.isEmpty() ? "nothing" : String.join(", ", visit.putIn)) + "; out "
+			+ escape(visit.tookOut.isEmpty() ? "nothing" : String.join(", ", visit.tookOut)) + "</body></html>");
+		chestUseVisit.setVisible(visit != null);
 
 		chestSteps.clear();
 		if (plan.getKey().equals(state.currentChest))

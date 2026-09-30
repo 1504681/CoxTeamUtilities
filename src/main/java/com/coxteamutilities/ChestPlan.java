@@ -3,11 +3,13 @@ package com.coxteamutilities;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 /**
  * What to do at one storage unit: things to put in and things to take out, in order.
- * A line is an item name, matched from its start so "Xeric's aid" covers every dose,
- * with an optional count like "Stinkhorn mushroom x3". "everything" deposits it all.
+ * A line is an item name, matched from its start so "Xeric's aid" covers every dose, or a pattern
+ * with * and ? like "*chinchompa", with an optional count like "Stinkhorn mushroom x3".
+ * "everything" deposits it all.
  */
 public final class ChestPlan
 {
@@ -22,6 +24,8 @@ public final class ChestPlan
 		public final String name;
 		public final int count;
 		public final boolean everything;
+		/** Compiled form of a name with wildcards, null for a plain name. */
+		private final Pattern pattern;
 
 		Line(String text)
 		{
@@ -45,13 +49,35 @@ public final class ChestPlan
 			}
 			this.name = name;
 			this.count = count;
+			this.pattern = name.contains("*") || name.contains("?") ? glob(name) : null;
+		}
+
+		private static Pattern glob(String name)
+		{
+			StringBuilder regex = new StringBuilder();
+			for (char c : name.toCharArray())
+			{
+				regex.append(c == '*' ? ".*" : c == '?' ? "." : Pattern.quote(String.valueOf(c)));
+			}
+			return Pattern.compile(regex.toString(), Pattern.CASE_INSENSITIVE);
 		}
 
 		/** Whether an item with this name is what the line asks for. */
 		public boolean matches(String itemName)
 		{
-			return everything || (itemName != null
-				&& itemName.toLowerCase(Locale.ROOT).startsWith(name.toLowerCase(Locale.ROOT)));
+			if (everything)
+			{
+				return true;
+			}
+			if (itemName == null)
+			{
+				return false;
+			}
+			if (pattern != null)
+			{
+				return pattern.matcher(itemName).matches();
+			}
+			return itemName.toLowerCase(Locale.ROOT).startsWith(name.toLowerCase(Locale.ROOT));
 		}
 
 		@Override
@@ -139,6 +165,39 @@ public final class ChestPlan
 			parsed.add(new Line(line));
 		}
 		return parsed;
+	}
+
+	/** What went in and what came out at one visit to a chest, in the order it happened. */
+	public static final class Visit
+	{
+		public final List<String> putIn = new ArrayList<>();
+		public final List<String> tookOut = new ArrayList<>();
+
+		/** Records items moving: count above zero went in, below zero came out. */
+		public void moved(String itemName, int count)
+		{
+			List<String> list = count > 0 ? putIn : tookOut;
+			String name = baseName(itemName);
+			int n = Math.abs(count);
+			if (!list.isEmpty())
+			{
+				Line last = new Line(list.get(list.size() - 1));
+				if (last.name.equals(name))
+				{
+					list.set(list.size() - 1, name + " x" + (last.count + n));
+					return;
+				}
+			}
+			if (list.size() < MAX_LINES)
+			{
+				list.add(n > 1 ? name + " x" + n : name);
+			}
+		}
+
+		public boolean isEmpty()
+		{
+			return putIn.isEmpty() && tookOut.isEmpty();
+		}
 	}
 
 	/**

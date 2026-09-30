@@ -28,6 +28,36 @@ public class ChestPlanTest
 	}
 
 	@Test
+	public void wildcardsMatchTheWholeName()
+	{
+		ChestPlan.Line chins = new ChestPlan.Line("*chinchompa");
+		assertTrue(chins.matches("Black chinchompa"));
+		assertTrue(chins.matches("Chinchompa"));
+		assertFalse(chins.matches("Chinchompa gloves"));
+		ChestPlan.Line dragon = new ChestPlan.Line("Dragon * x2");
+		assertTrue(dragon.matches("Dragon axe"));
+		assertFalse(dragon.matches("Dragonstone"));
+		assertEquals(2, dragon.count);
+		assertTrue(new ChestPlan.Line("Xeric's aid(?)").matches("Xeric's aid(4)"));
+		assertFalse(new ChestPlan.Line("Xeric's aid(?)").matches("Xeric's aid(+)(4)"));
+	}
+
+	@Test
+	public void aVisitRecordsWhatMovedInOrder()
+	{
+		ChestPlan.Visit visit = new ChestPlan.Visit();
+		visit.moved("Elder maul", 1);
+		visit.moved("Xeric's aid(4)", -1);
+		visit.moved("Xeric's aid(3)", -1);
+		visit.moved("Stinkhorn mushroom", -3);
+		visit.moved("Xeric's aid(4)", -1);
+		assertEquals(Collections.singletonList("Elder maul"), visit.putIn);
+		assertEquals(Arrays.asList("Xeric's aid x2", "Stinkhorn mushroom x3", "Xeric's aid"), visit.tookOut);
+		assertFalse(visit.isEmpty());
+		assertTrue(new ChestPlan.Visit().isEmpty());
+	}
+
+	@Test
 	public void inventoryBecomesLinesInSlotOrder()
 	{
 		List<String> lines = ChestPlan.fromInventory(Arrays.asList(

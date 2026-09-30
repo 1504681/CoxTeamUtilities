@@ -152,6 +152,12 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	private final Map<String, String> roomKeys = new LinkedHashMap<>();
 	private String lastRoomSlot;
 	private final Map<Integer, String> itemNames = new HashMap<>();
+	/** What moved at each chest the last time it was open. */
+	private final Map<String, ChestPlan.Visit> visits = new HashMap<>();
+	/** The visit being recorded while a storage is open. */
+	private ChestPlan.Visit visit;
+	private String visitChest;
+	private volatile boolean recordVisits;
 	private volatile Needs needs = Needs.defaults();
 	private volatile Needs needsSolo = Needs.soloDefaults();
 	/** Whether the sidebar shows and edits the solo doses outside a raid. */
@@ -220,6 +226,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		overlayManager.add(chestOverlay);
 		overlayManager.add(chestItemOverlay);
 		chests = ChestBook.parse(config.chests(), gson);
+		recordVisits = config.chestRecord();
 
 		wsClient.registerMessage(CoxStatusMessage.class);
 		wsClient.registerMessage(CoxPlanMessage.class);
@@ -243,6 +250,8 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		currentChest = null;
 		openChest = null;
 		itemNames.clear();
+		visits.clear();
+		visit = null;
 		clientToolbar.removeNavigation(navigationButton);
 		overlay.setLines(Collections.emptyList());
 		panel = null;
@@ -347,6 +356,8 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			{
 				saveChests();
 			}
+			visit = new ChestPlan.Visit();
+			visitChest = key;
 			updateOpenChest();
 			refresh();
 		}
@@ -362,6 +373,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			closedStorageUntil = client.getTickCount() + 1;
 			openStorage = 0;
 			openChest = null;
+			// the last deposit of a visit can land a tick after the close, so the visit is wrapped up then
 		}
 	}
 
@@ -410,6 +422,13 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	/** @param moved item id to the count that went into the storage, negative for what came out */
 	private void storageChanged(int storage, Map<Integer, Integer> moved)
 	{
+		if (visit != null)
+		{
+			for (Map.Entry<Integer, Integer> e : moved.entrySet())
+			{
+				visit.moved(itemName(e.getKey()), e.getValue());
+			}
+		}
 		if (storage == InterfaceID.RAIDS_STORAGE_PRIVATE)
 		{
 			for (Map.Entry<Integer, Integer> e : moved.entrySet())
@@ -507,6 +526,10 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 				changed = true;
 			}
 			trackRoom();
+			if (visit != null && openStorage == 0 && client.getTickCount() > closedStorageUntil)
+			{
+				finishVisit();
+			}
 			boolean olmNow = region() == OLM_REGION;
 			if (olmNow && !atOlm && config.olmReminder())
 			{
@@ -639,6 +662,42 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			currentChest = key;
 			refresh();
 		}
+	}
+
+	/** Keeps what moved during the visit and, when recording, makes it the chest's plan. */
+	private void finishVisit()
+	{
+		ChestPlan.Visit done = visit;
+		String key = visitChest;
+		visit = null;
+		visitChest = null;
+		if (key == null || done.isEmpty())
+		{
+			return;
+		}
+		synchronized (lock)
+		{
+			visits.put(key, done);
+		}
+		if (recordVisits)
+		{
+			applyVisit(key, done);
+		}
+		refresh();
+	}
+
+	private void applyVisit(String key, ChestPlan.Visit done)
+	{
+		ChestPlan plan = chests.getOrCreate(key, chestName(key));
+		if (plan == null)
+		{
+			return;
+		}
+		plan.getDeposit().clear();
+		plan.getDeposit().addAll(done.putIn);
+		plan.getWithdraw().clear();
+		plan.getWithdraw().addAll(done.tookOut);
+		saveChests();
 	}
 
 	/** "Farming 2", "Ice Demon" from a key like RAIDS_FARMING#2. */
@@ -1115,14 +1174,30 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	}
 
 	@Override
-	public void fillChestFromInventory(String key, boolean deposit)
+	public void useLastVisit(String key)
 	{
-		List<String> names;
+		ChestPlan.Visit done;
 		synchronized (lock)
 		{
-			names = inventoryNames;
+			done = visits.get(key);
 		}
-		setChestLines(key, deposit, String.join("\n", ChestPlan.fromInventory(names)));
+		if (done != null)
+		{
+			applyVisit(key, done);
+			clientThread.invokeLater(this::updateOpenChest);
+			refresh();
+		}
+	}
+
+	@Override
+	public void setRecordVisits(boolean record)
+	{
+		if (recordVisits != record)
+		{
+			recordVisits = record;
+			configManager.setConfiguration(CoxTeamUtilitiesConfig.GROUP, CoxTeamUtilitiesConfig.KEY_CHEST_RECORD, record);
+			refresh();
+		}
 	}
 
 	@Override
@@ -1331,9 +1406,11 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		state.units = config.needUnits();
 		state.chests = chests.copy(gson);
 		state.currentChest = currentChest;
+		state.recordVisits = recordVisits;
 		synchronized (lock)
 		{
 			state.inventoryNames = inventoryNames;
+			state.visits.putAll(visits);
 		}
 		state.separateSoloNeeds = config.separateSoloNeeds();
 		state.trackStamina = config.trackStamina();

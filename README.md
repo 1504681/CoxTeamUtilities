@@ -59,7 +59,9 @@ The wiki has no numbers for larger teams, so use `-` and `+` to set what your te
 
 ## Chests
 
-Each storage unit in the raid gets its own plan: what to put in and what to take out. Open a storage unit and the chest appears under **Chests**, named after its room (`Ice Demon`, `Farming 1`, `Farming 2`, the two farming rooms are told apart by which comes first). Rename it, then fill the two lists: one item per line, matched from the start of the name so `Xeric's aid` is any dose, `Stinkhorn mushroom x3` for a number, `everything` to empty the inventory. `← inventory` fills a list from what you're carrying right now, in slot order, which is the easy way to set up an ordered withdraw: arrange your inventory once, click the button.
+Each storage unit in the raid gets its own plan: what to put in and what to take out. Open a storage unit and the chest appears under **Chests**, named after its room (`Ice Demon`, `Farming 1`, `Farming 2`, the two farming rooms are told apart by which comes first). Rename it, then fill the two lists: one item per line, matched from the start of the name so `Xeric's aid` is any dose, `*` and `?` as wildcards (`*chinchompa`, `Dragon *`), `Stinkhorn mushroom x3` for a number, `everything` to empty the inventory.
+
+The easy way to set the lists up is to not type them: the plugin records what you put in and took out at every storage you open, in order, and shows it under the lists as `Last visit`. `Use last visit` makes that the chest's plan; tick **Record visits** and every visit rewrites its chest's plan, so one raid done the way you want it fills in every chest, then untick it.
 
 Tick **Withdraw in this order** and the list becomes steps 1, 2, 3. While the storage is open an overlay lists the steps and ticks them off as your inventory changes, and the items still to move glow: in the side inventory what goes in, in the storage what comes out. Ordered lists glow only the next item, or all of them in a gradient from the first colour to the last with their numbers (setting). Colours and the pulse are settings too.
 
