@@ -26,7 +26,9 @@ Overload, Xeric's aid, Revitalisation and Prayer enhance in your inventory and p
 
 When you walk into Olm you get a chat line with whatever you're still short.
 
-The game only sends storage contents when you open the storage unit, so both storages show `?` until you've opened them in the current raid.
+Under the rows a grid shows what each party member holds in inventory + private storage, the shared storage, and the total.
+
+The game only sends a storage's contents while its interface is open, so both storages show `?` until someone has opened them in the current raid (a party member's view of the shared storage is used if you haven't opened it yourself). A deposit or withdrawal made as the interface closes doesn't come back from the game either, so the plugin works those out from what left or entered your inventory.
 
 ## Claims
 
@@ -57,7 +59,7 @@ The wiki has no numbers for larger teams, so use `-` and `+` to set what your te
 
 ## Party
 
-Join a party with the core Party plugin. Each member with this plugin shows up under Team with their roles, missing items and doses carried. Claims and drop count edits are shared.
+Join a party with the core Party plugin. Each member with this plugin shows up under Team with their roles and missing items, and in the Supplies grid with their doses. Claims, drop count edits and the shared storage contents are shared.
 
 ## Settings
 

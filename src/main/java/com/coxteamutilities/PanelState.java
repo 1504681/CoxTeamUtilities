@@ -275,11 +275,29 @@ final class PanelState
 		{
 			held = held.plus(privateStorage);
 		}
-		if (countShared && sharedStorage != null)
+		Supplies shared = shared();
+		if (countShared && shared != null)
 		{
-			held = held.plus(sharedStorage);
+			held = held.plus(shared);
 		}
 		return held;
+	}
+
+	/** The shared storage as you saw it, or as a party member did if you haven't opened it. */
+	Supplies shared()
+	{
+		if (sharedStorage != null)
+		{
+			return sharedStorage;
+		}
+		for (Member member : team)
+		{
+			if (member.status != null && member.status.getShared() != null)
+			{
+				return member.status.getShared();
+			}
+		}
+		return null;
 	}
 
 	/** Overload doses you hold as sets of elder, twisted and kodai. */

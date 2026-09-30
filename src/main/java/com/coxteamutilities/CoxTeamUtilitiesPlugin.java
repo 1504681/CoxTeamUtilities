@@ -28,6 +28,9 @@ import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.VarbitChanged;
+import net.runelite.api.events.WidgetClosed;
+import net.runelite.api.events.WidgetLoaded;
+import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.client.Notifier;
@@ -138,7 +141,15 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	private Supplies sharedStorage;
 
 	// client thread only
-	private Item[] privateItems = new Item[0];
+	/** What's in the private storage, by item id, as last seen or worked out from deposits. */
+	private final Map<Integer, Integer> privateItems = new HashMap<>();
+	/** Item counts in the inventory at the last inventory change, to see what a deposit moved. */
+	private final Map<Integer, Integer> lastInventory = new HashMap<>();
+	/** The storage interface that is open (its group id), 0 for none. */
+	private int openStorage;
+	/** The storage interface that just closed, and the last tick a deposit still counts for it. */
+	private int closedStorage;
+	private int closedStorageUntil;
 	private boolean inRaid;
 	private boolean soloRaid;
 	private boolean atOlm;
@@ -211,7 +222,9 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			sharedStorage = null;
 		}
 		plan.clear();
-		privateItems = new Item[0];
+		privateItems.clear();
+		lastInventory.clear();
+		openStorage = 0;
 		inRaid = false;
 		lastSent = null;
 	}
@@ -252,19 +265,24 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		switch (event.getContainerId())
 		{
 			case InventoryID.INV:
+				inventoryChanged(event.getItemContainer().getItems());
+				loadoutDirty = true;
+				break;
 			case InventoryID.WORN:
 				loadoutDirty = true;
 				break;
 			case InventoryID.RAIDS_PRIVATESTORAGE:
 				if (inRaid)
 				{
-					privateItems = event.getItemContainer().getItems().clone();
-					Supplies stored = count(privateItems);
-					synchronized (lock)
+					privateItems.clear();
+					for (Item item : event.getItemContainer().getItems())
 					{
-						privateStorage = stored;
+						if (item.getId() > 0)
+						{
+							privateItems.merge(item.getId(), item.getQuantity(), Integer::sum);
+						}
 					}
-					loadoutDirty = true;
+					publishPrivateStorage();
 				}
 				break;
 			case InventoryID.RAIDS_SHAREDSTORAGE:
@@ -279,6 +297,127 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 				}
 				break;
 		}
+	}
+
+	@Subscribe
+	public void onWidgetLoaded(WidgetLoaded event)
+	{
+		if (event.getGroupId() == InterfaceID.RAIDS_STORAGE_PRIVATE || event.getGroupId() == InterfaceID.RAIDS_STORAGE_SHARED)
+		{
+			openStorage = event.getGroupId();
+		}
+	}
+
+	@Subscribe
+	public void onWidgetClosed(WidgetClosed event)
+	{
+		if (event.getGroupId() == openStorage)
+		{
+			// a deposit made as the interface closes still shows up in the inventory this tick or the next
+			closedStorage = openStorage;
+			closedStorageUntil = client.getTickCount() + 1;
+			openStorage = 0;
+		}
+	}
+
+	/**
+	 * The game only sends a storage's contents while its interface is open, so a deposit made as it
+	 * closes never arrives. What left the inventory went into the storage, so it's added here.
+	 */
+	private void inventoryChanged(Item[] items)
+	{
+		Map<Integer, Integer> now = new HashMap<>();
+		for (Item item : items)
+		{
+			if (item.getId() > 0)
+			{
+				now.merge(item.getId(), item.getQuantity(), Integer::sum);
+			}
+		}
+		int storage = openStorage != 0 ? openStorage : client.getTickCount() <= closedStorageUntil ? closedStorage : 0;
+		if (storage != 0 && inRaid && !lastInventory.isEmpty())
+		{
+			Map<Integer, Integer> moved = new HashMap<>();
+			for (Map.Entry<Integer, Integer> e : lastInventory.entrySet())
+			{
+				int delta = e.getValue() - now.getOrDefault(e.getKey(), 0);
+				if (delta != 0)
+				{
+					moved.put(e.getKey(), delta);
+				}
+			}
+			for (Map.Entry<Integer, Integer> e : now.entrySet())
+			{
+				if (!lastInventory.containsKey(e.getKey()))
+				{
+					moved.put(e.getKey(), -e.getValue());
+				}
+			}
+			if (!moved.isEmpty())
+			{
+				storageChanged(storage, moved);
+			}
+		}
+		lastInventory.clear();
+		lastInventory.putAll(now);
+	}
+
+	/** @param moved item id to the count that went into the storage, negative for what came out */
+	private void storageChanged(int storage, Map<Integer, Integer> moved)
+	{
+		if (storage == InterfaceID.RAIDS_STORAGE_PRIVATE)
+		{
+			for (Map.Entry<Integer, Integer> e : moved.entrySet())
+			{
+				int quantity = privateItems.getOrDefault(e.getKey(), 0) + e.getValue();
+				if (quantity > 0)
+				{
+					privateItems.put(e.getKey(), quantity);
+				}
+				else
+				{
+					privateItems.remove(e.getKey());
+				}
+			}
+			publishPrivateStorage();
+		}
+		else
+		{
+			Supplies shared;
+			synchronized (lock)
+			{
+				shared = sharedStorage;
+			}
+			if (shared == null)
+			{
+				return;
+			}
+			int[] doses = shared.toArray();
+			for (Map.Entry<Integer, Integer> e : moved.entrySet())
+			{
+				Potion potion = Potion.of(e.getKey());
+				if (potion != null)
+				{
+					doses[potion.ordinal()] += potion.doses(e.getKey()) * e.getValue();
+				}
+			}
+			Supplies changed = Supplies.of(doses);
+			synchronized (lock)
+			{
+				sharedStorage = changed;
+			}
+			loadoutDirty = true;
+		}
+	}
+
+	private void publishPrivateStorage()
+	{
+		Supplies stored = count(privateItems);
+		synchronized (lock)
+		{
+			privateStorage = stored;
+		}
+		loadoutDirty = true;
 	}
 
 	@Subscribe
@@ -425,7 +564,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	{
 		soloRaid = false;
 		atOlm = false;
-		privateItems = new Item[0];
+		privateItems.clear();
 		synchronized (lock)
 		{
 			privateStorage = null;
@@ -447,6 +586,19 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		{
 			ids[i] = items[i].getId();
 			quantities[i] = items[i].getQuantity();
+		}
+		return Supplies.count(ids, quantities);
+	}
+
+	private static Supplies count(Map<Integer, Integer> items)
+	{
+		int[] ids = new int[items.size()];
+		int[] quantities = new int[items.size()];
+		int i = 0;
+		for (Map.Entry<Integer, Integer> e : items.entrySet())
+		{
+			ids[i] = e.getKey();
+			quantities[i++] = e.getValue();
 		}
 		return Supplies.count(ids, quantities);
 	}
@@ -474,7 +626,10 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		{
 			add(loadout, worn.getItems());
 		}
-		add(loadout, privateItems);
+		for (Map.Entry<Integer, Integer> e : privateItems.entrySet())
+		{
+			loadout.add(e.getKey(), e.getValue());
+		}
 		if (loadout.quantityOfAny(POUCHES) > 0)
 		{
 			addPouch(loadout);
@@ -626,7 +781,8 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 				claimed.add(claim.encode());
 			}
 			Supplies carried = privateStorage == null ? inventory : inventory.plus(privateStorage);
-			status = new CoxStatusMessage(Role.names(roles), describe(missing), claimed, carried.toArray(), iron);
+			status = new CoxStatusMessage(Role.names(roles), describe(missing), claimed, carried.toArray(),
+				sharedStorage == null ? null : sharedStorage.toArray(), iron);
 		}
 		if (resendStatus || !status.sameContent(lastSent))
 		{
@@ -946,7 +1102,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			state.missing.putAll(missing);
 
 			MemberStatus mine = new MemberStatus(EnumSet.copyOf(state.roles), describe(missing),
-				claims.bySlot(), privateStorage == null ? inventory : inventory.plus(privateStorage), iron);
+				claims.bySlot(), privateStorage == null ? inventory : inventory.plus(privateStorage), sharedStorage, iron);
 
 			state.claimed = claims.doses();
 

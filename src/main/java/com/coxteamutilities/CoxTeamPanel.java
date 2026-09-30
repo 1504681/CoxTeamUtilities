@@ -15,7 +15,9 @@ import java.awt.event.FocusEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import javax.swing.JCheckBox;
@@ -125,6 +127,7 @@ class CoxTeamPanel extends PluginPanel
 	private final JLabel teamTab = small("Team", Color.WHITE);
 	private final JLabel soloTab = small("Solo", MUTED);
 	private NeedUnits units = NeedUnits.DOSES;
+	private final JPanel storageGrid = new JPanel(new GridBagLayout());
 	private final JLabel claimCount = small("", GOOD);
 	private final JLabel claimsToggle = small("show", MUTED);
 	private final JPanel claimsSection = new JPanel(new BorderLayout());
@@ -298,7 +301,93 @@ class CoxTeamPanel extends PluginPanel
 			body.addRow(row, first ? 0 : 6);
 			first = false;
 		}
+		storageGrid.setOpaque(false);
+		storageGrid.setToolTipText("Inventory + private storage of everyone in the party, the shared storage, and all of it added up");
+		body.addRow(storageGrid, 8);
 		return body;
+	}
+
+	/** Who holds what: a row per party member, one for the shared storage and a total. */
+	private void rebuildStorageGrid(PanelState state)
+	{
+		storageGrid.removeAll();
+		List<Potion> potions = new ArrayList<>();
+		for (Potion potion : Potion.values())
+		{
+			if (potion.isSupply() && !potion.isSoloOnly())
+			{
+				potions.add(potion);
+			}
+		}
+		GridBagConstraints c = new GridBagConstraints();
+		c.insets = new Insets(1, 0, 1, 4);
+		c.anchor = GridBagConstraints.WEST;
+		c.fill = GridBagConstraints.HORIZONTAL;
+		c.gridy = 0;
+		gridRow(c, "", MUTED, potions, potion -> potion.getShortName(), null);
+
+		int[] total = new int[Potion.values().length];
+		List<PanelState.Member> members = state.team;
+		if (members.isEmpty())
+		{
+			PanelState.Member me = new PanelState.Member();
+			me.name = "You";
+			me.self = true;
+			me.status = new MemberStatus(EnumSet.noneOf(Role.class), Collections.emptyList(), Collections.emptyMap(),
+				state.privateStorage == null ? state.inventory : state.inventory.plus(state.privateStorage), null, false);
+			members = Collections.singletonList(me);
+		}
+		for (PanelState.Member member : members)
+		{
+			c.gridy++;
+			Supplies carried = member.status == null ? null : member.status.getCarried();
+			gridRow(c, member.self ? "You" : member.name, member.self ? GOOD : Color.WHITE, potions,
+				potion -> carried == null ? "?" : units.format(carried.doses(potion)),
+				member.self && state.privateStorage == null ? "Your private storage hasn't been opened this raid" : null);
+			if (carried != null)
+			{
+				for (Potion potion : potions)
+				{
+					total[potion.ordinal()] += carried.doses(potion);
+				}
+			}
+		}
+		c.gridy++;
+		Supplies shared = state.shared();
+		gridRow(c, "Shared", Color.WHITE, potions, potion -> shared == null ? "?" : units.format(shared.doses(potion)),
+			shared == null ? "Nobody has opened the shared storage this raid" : null);
+		if (shared != null)
+		{
+			for (Potion potion : potions)
+			{
+				total[potion.ordinal()] += shared.doses(potion);
+			}
+		}
+		c.gridy++;
+		gridRow(c, "Total", MUTED, potions, potion -> units.format(total[potion.ordinal()]), null);
+		storageGrid.revalidate();
+	}
+
+	private void gridRow(GridBagConstraints c, String name, Color color, List<Potion> potions,
+		java.util.function.Function<Potion, String> cell, String tooltip)
+	{
+		c.gridx = 0;
+		c.weightx = 1;
+		JLabel label = small(name, color);
+		label.setToolTipText(tooltip == null && name.length() > MAX_NAME ? name : tooltip);
+		// a long name gets the column's share and an ellipsis, not a wider grid
+		label.setPreferredSize(new Dimension(60, label.getPreferredSize().height));
+		storageGrid.add(label, c);
+		c.weightx = 0;
+		for (Potion potion : potions)
+		{
+			c.gridx++;
+			JLabel value = small(cell.apply(potion), color);
+			value.setHorizontalAlignment(SwingConstants.RIGHT);
+			value.setPreferredSize(new Dimension(30, value.getPreferredSize().height));
+			value.setToolTipText(potion.getDisplayName());
+			storageGrid.add(value, c);
+		}
 	}
 
 	/** Team | Solo, which set of "need" numbers is shown and edited. */
@@ -460,7 +549,8 @@ class CoxTeamPanel extends PluginPanel
 
 			String inventory = "inv " + units.format(state.inventory.doses(potion));
 			String stored = "private " + (state.privateStorage == null ? "?" : units.format(state.privateStorage.doses(potion)));
-			String shared = "shared " + (state.sharedStorage == null ? "?" : units.format(state.sharedStorage.doses(potion)));
+			Supplies sharedStorage = state.shared();
+			String shared = "shared " + (sharedStorage == null ? "?" : units.format(sharedStorage.doses(potion)));
 			String split = potion != Potion.OVERLOAD ? "" : "<br>split overload " + units.format(state.splitHeld()) + " held"
 				+ (state.countSplit ? "" : " (not counted)");
 			JLabel detail = detailLabels.get(potion);
@@ -479,6 +569,7 @@ class CoxTeamPanel extends PluginPanel
 			}
 		}
 		updateNeeds(state);
+		rebuildStorageGrid(state);
 	}
 
 	private void updateNeeds(PanelState state)
@@ -555,18 +646,6 @@ class CoxTeamPanel extends PluginPanel
 				teamBody.addRow(wrapped("Missing " + missing, BAD), 0);
 			}
 
-			StringBuilder carried = new StringBuilder();
-			for (Potion potion : Potion.values())
-			{
-				if (potion.isSupply() && !potion.isSoloOnly())
-				{
-					carried.append(carried.length() == 0 ? "" : "  ")
-						.append(potion.getShortName()).append(' ').append(units.format(status.getCarried().doses(potion)));
-				}
-			}
-			JLabel doses = small(carried.toString(), MUTED);
-			doses.setToolTipText(units + " in their inventory and private storage");
-			teamBody.addRow(doses, 0);
 		}
 	}
 

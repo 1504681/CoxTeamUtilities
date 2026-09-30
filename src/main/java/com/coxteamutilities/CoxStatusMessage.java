@@ -12,6 +12,8 @@ public class CoxStatusMessage extends PartyMemberMessage
 	private List<String> missing;
 	private List<String> claims;
 	private int[] carried;
+	/** Shared storage as this member last saw it, null if they haven't opened it this raid. */
+	private int[] shared;
 	private boolean iron;
 
 	public CoxStatusMessage()
@@ -19,13 +21,14 @@ public class CoxStatusMessage extends PartyMemberMessage
 	}
 
 	public CoxStatusMessage(List<String> roles, List<String> missing, List<String> claims, int[] carried,
-		boolean iron)
+		int[] shared, boolean iron)
 	{
 		this.iron = iron;
 		this.roles = roles;
 		this.missing = missing;
 		this.claims = claims;
 		this.carried = carried;
+		this.shared = shared;
 	}
 
 	public List<String> getRoles()
@@ -48,6 +51,11 @@ public class CoxStatusMessage extends PartyMemberMessage
 		return carried;
 	}
 
+	public int[] getShared()
+	{
+		return shared;
+	}
+
 	public boolean isIron()
 	{
 		return iron;
@@ -60,6 +68,7 @@ public class CoxStatusMessage extends PartyMemberMessage
 			&& Objects.equals(missing, other.missing)
 			&& Objects.equals(claims, other.claims)
 			&& Arrays.equals(carried, other.carried)
+			&& Arrays.equals(shared, other.shared)
 			&& iron == other.iron;
 	}
 }

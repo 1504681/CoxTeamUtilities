@@ -20,16 +20,19 @@ public final class MemberStatus
 	private final List<String> missing;
 	private final Map<Slot, Claim> claims;
 	private final Supplies carried;
+	/** null until they open the shared storage */
+	private final Supplies shared;
 	private final boolean iron;
 
 	public MemberStatus(Set<Role> roles, List<String> missing, Map<Slot, Claim> claims, Supplies carried,
-		boolean iron)
+		Supplies shared, boolean iron)
 	{
 		this.iron = iron;
 		this.roles = roles;
 		this.missing = missing;
 		this.claims = claims;
 		this.carried = carried;
+		this.shared = shared;
 	}
 
 	public static MemberStatus from(CoxStatusMessage message)
@@ -58,7 +61,7 @@ public final class MemberStatus
 			}
 		}
 		return new MemberStatus(Role.parse(message.getRoles()), missing, claims, Supplies.of(message.getCarried()),
-			message.isIron());
+			message.getShared() == null ? null : Supplies.of(message.getShared()), message.isIron());
 	}
 
 	public Set<Role> getRoles()
@@ -84,5 +87,10 @@ public final class MemberStatus
 	public Supplies getCarried()
 	{
 		return carried;
+	}
+
+	public Supplies getShared()
+	{
+		return shared;
 	}
 }
