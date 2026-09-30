@@ -147,6 +147,8 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	private volatile ChestBook chests = new ChestBook();
 	/** Names of the item in each inventory slot, null for empty, for the chest plans. */
 	private List<String> inventoryNames = Collections.emptyList();
+	/** The inventory when the storage was opened, so a "put in xN" line knows how many went in. */
+	private List<String> openedWith = Collections.emptyList();
 	/** Key of the chest for the room the player is in, null outside a room with one. */
 	private volatile String currentChest;
 	/** Progress at the chest whose storage is open, for the overlays. */
@@ -328,6 +330,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 						}
 					}
 					publishPrivateStorage();
+					updateOpenChest();
 				}
 				break;
 			case InventoryID.RAIDS_SHAREDSTORAGE:
@@ -339,6 +342,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 						sharedStorage = stored;
 					}
 					loadoutDirty = true;
+					updateOpenChest();
 				}
 				break;
 		}
@@ -350,6 +354,10 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		if (event.getGroupId() == InterfaceID.RAIDS_STORAGE_PRIVATE || event.getGroupId() == InterfaceID.RAIDS_STORAGE_SHARED)
 		{
 			openStorage = event.getGroupId();
+			synchronized (lock)
+			{
+				openedWith = inventoryNames;
+			}
 			String key = currentChest;
 			if (key != null && chests.get(key) == null && chests.getOrCreate(key, chestName(key)) != null)
 			{
@@ -746,12 +754,37 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	private void updateOpenChest()
 	{
 		ChestPlan plan = openStorage == 0 ? null : chests.get(currentChest);
+		if (plan == null)
+		{
+			openChest = null;
+			return;
+		}
 		List<String> names;
 		synchronized (lock)
 		{
 			names = inventoryNames;
 		}
-		openChest = plan == null ? null : new ChestProgress(plan, names);
+		openChest = new ChestProgress(plan, names, openedWith, storageNames());
+	}
+
+	/** Names of what's in the open storage, one per slot. */
+	private List<String> storageNames()
+	{
+		ItemContainer storage = client.getItemContainer(openStorage == InterfaceID.RAIDS_STORAGE_SHARED
+			? InventoryID.RAIDS_SHAREDSTORAGE : InventoryID.RAIDS_PRIVATESTORAGE);
+		if (storage == null)
+		{
+			return Collections.emptyList();
+		}
+		List<String> names = new ArrayList<>();
+		for (Item item : storage.getItems())
+		{
+			if (item.getId() > 0)
+			{
+				names.add(itemName(item.getId()));
+			}
+		}
+		return names;
 	}
 
 	/** Item name from the cache, filled on the client thread. */

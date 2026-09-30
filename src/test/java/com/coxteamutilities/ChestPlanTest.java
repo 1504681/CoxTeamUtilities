@@ -44,6 +44,24 @@ public class ChestPlanTest
 	}
 
 	@Test
+	public void aCountedDepositIsDoneOnceThatManyWentIn()
+	{
+		ChestPlan plan = new ChestPlan("RAIDS_FARMING#1", "Farming 1");
+		plan.getDeposit().add("Endarkened* x2");
+		List<String> three = Arrays.asList("Endarkened juice", "Endarkened juice", "Endarkened juice");
+		List<String> one = Collections.singletonList("Endarkened juice");
+		List<String> none = Collections.emptyList();
+		assertFalse(new ChestProgress(plan, three, three, none).deposits.get(0).done);
+		assertTrue(new ChestProgress(plan, one, three, none).deposits.get(0).done);
+		assertTrue(new ChestProgress(plan, three, three, Arrays.asList("Endarkened juice", "Endarkened juice")).deposits.get(0).done);
+		assertFalse(new ChestProgress(plan, three, three, one).deposits.get(0).done);
+		// without a number every one of them goes in
+		plan.getDeposit().set(0, "Endarkened*");
+		assertFalse(new ChestProgress(plan, one, three, three).deposits.get(0).done);
+		assertTrue(new ChestProgress(plan, none, three, none).deposits.get(0).done);
+	}
+
+	@Test
 	public void markingCountsClicksPerItem()
 	{
 		List<String> lines = new ArrayList<>(Collections.singletonList("*chinchompa"));

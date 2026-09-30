@@ -4,7 +4,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/** A chest's plan checked against what's in the inventory right now. */
+/**
+ * A chest's plan checked against the inventory right now. A deposit is done when none of the item is
+ * left, or, for a line with a number, when that many went in since the storage was opened or are
+ * already in it. A withdrawal is done when the inventory holds the number asked for.
+ */
 public final class ChestProgress
 {
 	public static final class Step
@@ -30,11 +34,23 @@ public final class ChestProgress
 
 	public ChestProgress(ChestPlan plan, List<String> inventoryNames)
 	{
+		this(plan, inventoryNames, inventoryNames, Collections.emptyList());
+	}
+
+	/**
+	 * @param openedWith the inventory when the storage was opened
+	 * @param storageNames what the storage holds now
+	 */
+	public ChestProgress(ChestPlan plan, List<String> inventoryNames, List<String> openedWith, List<String> storageNames)
+	{
 		this.plan = plan;
 		List<Step> deposits = new ArrayList<>();
 		for (ChestPlan.Line line : ChestPlan.parse(plan.getDeposit()))
 		{
-			deposits.add(new Step(line, true, count(line, inventoryNames) == 0, 0));
+			int left = count(line, inventoryNames);
+			boolean done = left == 0 || (line.counted
+				&& (count(line, openedWith) - left >= line.count || count(line, storageNames) >= line.count));
+			deposits.add(new Step(line, true, done, 0));
 		}
 		List<Step> withdrawals = new ArrayList<>();
 		int order = 0;

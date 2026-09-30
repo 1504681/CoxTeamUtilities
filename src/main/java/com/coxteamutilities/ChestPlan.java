@@ -23,6 +23,8 @@ public final class ChestPlan
 		public final String text;
 		public final String name;
 		public final int count;
+		/** Whether the line says how many with " xN"; a deposit without it means all of them. */
+		public final boolean counted;
 		public final boolean everything;
 		/** Compiled form of a name with wildcards, null for a plain name. */
 		private final Pattern pattern;
@@ -33,6 +35,7 @@ public final class ChestPlan
 			String lower = text.toLowerCase(Locale.ROOT);
 			everything = lower.equals(EVERYTHING) || lower.equals("*") || lower.equals("all");
 			int count = 1;
+			boolean counted = false;
 			String name = text;
 			int x = lower.lastIndexOf(" x");
 			if (x > 0)
@@ -41,6 +44,7 @@ public final class ChestPlan
 				{
 					count = Math.max(1, Integer.parseInt(lower.substring(x + 2).trim()));
 					name = text.substring(0, x).trim();
+					counted = true;
 				}
 				catch (NumberFormatException e)
 				{
@@ -49,6 +53,7 @@ public final class ChestPlan
 			}
 			this.name = name;
 			this.count = count;
+			this.counted = counted;
 			this.pattern = name.contains("*") || name.contains("?") ? glob(name) : null;
 		}
 
