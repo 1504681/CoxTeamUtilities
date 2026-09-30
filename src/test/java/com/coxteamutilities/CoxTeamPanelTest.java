@@ -82,11 +82,12 @@ public class CoxTeamPanelTest
 		me.self = true;
 		me.status = new MemberStatus(EnumSet.copyOf(state.roles),
 			Arrays.asList("Standard spellbook (Muttadile Entangler)", "Nature runes (Muttadile Entangler)"),
-			new LinkedHashMap<>(), Supplies.of(new int[]{4, 12, 4, 4}));
+			new LinkedHashMap<>(), Supplies.of(new int[]{4, 12, 4, 4}), false);
 		PanelState.Member bob = new PanelState.Member();
 		bob.name = "Zezima the 2nd";
 		bob.status = new MemberStatus(EnumSet.of(Role.TIGHTROPE_VENATOR, Role.TIGHTROPE_TELEGRAB),
-			Collections.emptyList(), new LinkedHashMap<>(), Supplies.of(new int[]{8, 8, 8, 8}));
+			Collections.emptyList(), new LinkedHashMap<>(), Supplies.of(new int[]{8, 8, 8, 8}), true);
+		bob.iron = true;
 		PanelState.Member quiet = new PanelState.Member();
 		quiet.name = "No Plugin";
 		state.team.addAll(Arrays.asList(me, bob, quiet));
@@ -118,10 +119,10 @@ public class CoxTeamPanelTest
 					slot.slot = new Slot(room, potion, i);
 					if (potion == Potion.OVERLOAD && i == 0 && room == CmRoom.TEKTON)
 					{
-						// shared: you sip twice and drop it, they pick it up
-						slot.add("You", true, new Claim(slot.slot, 2, 1, Arrays.asList(CmRoom.TEKTON, CmRoom.ICE_DEMON)));
-						slot.add("Zezima the 2nd", false,
-							new Claim(slot.slot, 2, 2, Arrays.asList(CmRoom.VANGUARDS, CmRoom.VESPULA)));
+						// shared: the ironman sips first and drops it, you pick it up
+						slot.add("You", true, new Claim(slot.slot, 3, 1, Arrays.asList(CmRoom.ICE_DEMON, CmRoom.VANGUARDS)));
+						slot.add("Zezima the 2nd", false, true,
+							new Claim(slot.slot, 1, 2, Collections.singletonList(CmRoom.TEKTON)));
 					}
 					else if (potion == Potion.OVERLOAD && i == 0)
 					{

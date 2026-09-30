@@ -431,7 +431,7 @@ class CoxTeamPanel extends PluginPanel
 		for (PanelState.Member member : state.team)
 		{
 			MemberStatus status = member.status;
-			JLabel name = new JLabel(member.name + (member.self ? " (you)" : ""));
+			JLabel name = new JLabel(member.name + (member.iron ? " (iron)" : "") + (member.self ? " (you)" : ""));
 			name.setFont(FontManager.getRunescapeSmallFont());
 			teamBody.addRow(name, first ? 0 : 8);
 			first = false;
@@ -593,9 +593,11 @@ class CoxTeamPanel extends PluginPanel
 		else
 		{
 			List<String> names = new ArrayList<>();
+			boolean ironFirst = false;
 			for (PanelState.Holder holder : slot.holders)
 			{
 				names.add(holder.name);
+				ironFirst |= holder.iron && !holder.self;
 			}
 			String text = shorten((slot.planned() ? "#" + number + " " : "") + String.join("/", names));
 
@@ -616,7 +618,12 @@ class CoxTeamPanel extends PluginPanel
 				color = MINE;
 				hint = "Click to drop your claim.";
 			}
-			else if (slot.freeDoses() > 0)
+			else if (slot.viewerIron && slot.availableToMe() > 0)
+			{
+				color = OPEN;
+				hint = "Click to take the first sip and drop it for them. Ironmen go first.";
+			}
+			else if (slot.freeDoses() > 0 && slot.availableToMe() > 0)
 			{
 				color = OPEN;
 				hint = "Click to pick it up after them and take the " + slot.freeDoses() + " left.";
@@ -624,9 +631,10 @@ class CoxTeamPanel extends PluginPanel
 			else
 			{
 				color = TAKEN;
-				hint = "All claimed.";
+				hint = slot.viewerIron && ironFirst ? "An ironman has it, you can't pick up what they drop."
+					: "All claimed.";
 			}
-			boolean clickable = slot.me() != null || slot.freeDoses() > 0;
+			boolean clickable = slot.me() != null || slot.availableToMe() > 0;
 			chip = chip(text, color, "<html>" + String.join("<br>", plan) + "<br><br>" + hint
 				+ (clickable ? " " + menuHint : "") + "</html>", clickable ? click : null);
 		}
@@ -641,7 +649,8 @@ class CoxTeamPanel extends PluginPanel
 		int available = slot.availableToMe();
 		if (available == 0)
 		{
-			JMenuItem none = new JMenuItem("All " + Claim.MAX_DOSES + " doses are claimed");
+			JMenuItem none = new JMenuItem(slot.viewerIron ? "Another ironman has it"
+				: "All " + Claim.MAX_DOSES + " doses are claimed");
 			none.setEnabled(false);
 			menu.add(none);
 			return menu;

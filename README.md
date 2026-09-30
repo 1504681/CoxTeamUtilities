@@ -33,7 +33,9 @@ To share a potion, right click its box:
 - `Take 1 dose` to `Take 4 doses` sets how many doses are yours.
 - `Sip at` ticks the rooms you sip at, from the room that drops it up to Olm. One more room than doses takes one more dose if there is one.
 
-Under the boxes each shared potion lists who holds it in order: `#1 You: 2 doses (Tekton, Vanguards), then drop for Bob`, then `Bob: pick up, 2 doses (Vespula, Vasa)`. Whoever sips at the earliest room holds it first. Without rooms it's whoever claimed first. A blue box has doses left: click it to be the one who picks it up. This is a plan everyone can see, the plugin doesn't watch who drinks or drops.
+Under the boxes each shared potion lists who holds it in order: `#1 You: 2 doses (Tekton, Vanguards), then drop for Bob`, then `Bob: pick up, 2 doses (Vespula, Vasa)`. Whoever sips at the earliest room holds it first. Without rooms it's whoever claimed first.
+
+Ironmen can't pick up a potion someone else has held, so an ironman always holds it first and then drops it for the others. An ironman can claim doses of a potion others have already claimed: a click takes one sip in front of them, and their claims shrink to what's left. Only one ironman can be on a potion. The plugin reads the account type from the game, there's nothing to set. A blue box has doses left: click it to be the one who picks it up. This is a plan everyone can see, the plugin doesn't watch who drinks or drops.
 
 Counts start from the OSRS Wiki drop tables:
 

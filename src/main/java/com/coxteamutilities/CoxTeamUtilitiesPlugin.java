@@ -141,6 +141,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	private volatile boolean resendStatus;
 	private volatile boolean sendPlan;
 	private volatile boolean showOverlay;
+	private volatile boolean iron;
 
 	@Provides
 	CoxTeamUtilitiesConfig provideConfig(ConfigManager configManager)
@@ -308,6 +309,13 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		{
 			inRaid = false;
 			leftRaid();
+			changed = true;
+		}
+
+		boolean ironNow = client.getVarbitValue(VarbitID.IRONMAN) != 0;
+		if (ironNow != iron)
+		{
+			iron = ironNow;
 			changed = true;
 		}
 
@@ -545,7 +553,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 				claimed.add(claim.encode());
 			}
 			Supplies carried = privateStorage == null ? inventory : inventory.plus(privateStorage);
-			status = new CoxStatusMessage(Role.names(roles), describe(missing), claimed, carried.toArray());
+			status = new CoxStatusMessage(Role.names(roles), describe(missing), claimed, carried.toArray(), iron);
 		}
 		if (resendStatus || !status.sameContent(lastSent))
 		{
@@ -568,6 +576,10 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		synchronized (lock)
 		{
 			members.put(message.getMemberId(), MemberStatus.from(message));
+			if (!iron)
+			{
+				claims.yieldTo(ironDoses());
+			}
 		}
 		refresh();
 	}
@@ -705,7 +717,8 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	{
 		synchronized (lock)
 		{
-			if (!claims.toggle(slot, available(slot), nextOrder(slot)))
+			PanelState.SlotView others = others(slot);
+			if (!claims.toggle(slot, others.takenOnClick(), others.nextOrder()))
 			{
 				return;
 			}
@@ -718,7 +731,8 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	{
 		synchronized (lock)
 		{
-			if (!claims.setDoses(slot, doses, available(slot), nextOrder(slot)))
+			PanelState.SlotView others = others(slot);
+			if (!claims.setDoses(slot, doses, others.availableToMe(), others.nextOrder()))
 			{
 				return;
 			}
@@ -731,7 +745,8 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	{
 		synchronized (lock)
 		{
-			if (!claims.setSipRoom(slot, room, sipThere, available(slot), nextOrder(slot)))
+			PanelState.SlotView others = others(slot);
+			if (!claims.setSipRoom(slot, room, sipThere, others.availableToMe(), others.nextOrder()))
 			{
 				return false;
 			}
@@ -740,38 +755,40 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		return true;
 	}
 
-	/** Doses of the potion the rest of the party hasn't claimed. Call with the lock held. */
-	private int available(Slot slot)
+	/** Everyone else's share of the potion. Call with the lock held. */
+	private PanelState.SlotView others(Slot slot)
 	{
-		int taken = 0;
-		for (MemberStatus status : members.values())
+		PanelState.SlotView view = new PanelState.SlotView();
+		view.slot = slot;
+		view.viewerIron = iron;
+		for (Map.Entry<Long, MemberStatus> e : members.entrySet())
 		{
-			for (Claim claim : status.getClaims())
+			for (Claim claim : e.getValue().getClaims())
 			{
 				if (claim.getSlot().equals(slot))
 				{
-					taken += claim.getDoses();
+					view.add(String.valueOf(e.getKey()), false, e.getValue().isIron(), claim);
 				}
 			}
 		}
-		return Math.max(0, Claim.MAX_DOSES - taken);
+		return view;
 	}
 
-	/** Behind everyone who already has a share. Call with the lock held. */
-	private int nextOrder(Slot slot)
+	/** Doses ironmen in the party have claimed, per potion. Call with the lock held. */
+	private Map<Slot, Integer> ironDoses()
 	{
-		int order = 0;
+		Map<Slot, Integer> doses = new HashMap<>();
 		for (MemberStatus status : members.values())
 		{
-			for (Claim claim : status.getClaims())
+			if (status.isIron())
 			{
-				if (claim.getSlot().equals(slot))
+				for (Claim claim : status.getClaims())
 				{
-					order = Math.max(order, claim.getOrder());
+					doses.merge(claim.getSlot(), claim.getDoses(), Integer::sum);
 				}
 			}
 		}
-		return order + 1;
+		return doses;
 	}
 
 	private void planEdited()
@@ -832,6 +849,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	{
 		PanelState state = new PanelState();
 		state.inParty = party.isInParty();
+		state.iron = iron;
 		state.countShared = config.countShared();
 		state.countClaimed = config.countClaimed();
 		state.countSplit = config.countSplit();
@@ -852,14 +870,14 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			state.missing.putAll(missing);
 
 			MemberStatus mine = new MemberStatus(EnumSet.copyOf(state.roles), describe(missing),
-				claims.bySlot(), privateStorage == null ? inventory : inventory.plus(privateStorage));
+				claims.bySlot(), privateStorage == null ? inventory : inventory.plus(privateStorage), iron);
 
 			state.claimed = claims.doses();
 
 			Map<Slot, PanelState.SlotView> shares = new HashMap<>();
 			for (Claim claim : claims.all())
 			{
-				shares.computeIfAbsent(claim.getSlot(), s -> new PanelState.SlotView()).add("You", true, claim);
+				shares.computeIfAbsent(claim.getSlot(), s -> new PanelState.SlotView()).add("You", true, iron, claim);
 			}
 			for (PartyMember member : partyMembers)
 			{
@@ -867,13 +885,14 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 				view.name = name(member);
 				view.self = local != null && local.getMemberId() == member.getMemberId();
 				view.status = view.self ? mine : members.get(member.getMemberId());
+				view.iron = view.status != null && view.status.isIron();
 				state.team.add(view);
 				if (!view.self && view.status != null)
 				{
 					for (Claim claim : view.status.getClaims())
 					{
 						shares.computeIfAbsent(claim.getSlot(), s -> new PanelState.SlotView())
-							.add(view.name, false, claim);
+							.add(view.name, false, view.iron, claim);
 					}
 				}
 			}
@@ -898,6 +917,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 						Slot slot = new Slot(room, potion, i);
 						PanelState.SlotView view = shares.getOrDefault(slot, new PanelState.SlotView());
 						view.slot = slot;
+						view.viewerIron = iron;
 						drop.slots.add(view);
 					}
 					drops.potions.add(drop);

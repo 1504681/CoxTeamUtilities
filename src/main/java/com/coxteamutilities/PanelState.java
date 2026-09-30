@@ -15,6 +15,7 @@ final class PanelState
 	{
 		String name;
 		boolean self;
+		boolean iron;
 		/** null until the member's plugin has sent something */
 		MemberStatus status;
 	}
@@ -24,13 +25,20 @@ final class PanelState
 	{
 		final String name;
 		final boolean self;
+		final boolean iron;
 		final Claim claim;
 
-		Holder(String name, boolean self, Claim claim)
+		Holder(String name, boolean self, boolean iron, Claim claim)
 		{
 			this.name = name;
 			this.self = self;
+			this.iron = iron;
 			this.claim = claim;
+		}
+
+		String label()
+		{
+			return iron ? name + " (iron)" : name;
 		}
 
 		/** Where they start sipping. With no rooms picked that's as soon as it drops. */
@@ -41,18 +49,80 @@ final class PanelState
 		}
 	}
 
-	/** One dropped potion and the people it is passed along, in the order they hold it. */
+	/**
+	 * One dropped potion and the people it is passed along, in the order they hold it.
+	 * An ironman can't pick up what someone else has held, so an ironman always holds it first,
+	 * outranks everyone else's claim, and there can only be one per potion.
+	 */
 	static final class SlotView
 	{
 		Slot slot;
+		/** Whether the person looking at the sidebar is an ironman. */
+		boolean viewerIron;
 		final List<Holder> holders = new ArrayList<>();
 
 		void add(String name, boolean self, Claim claim)
 		{
-			holders.add(new Holder(name, self, claim));
-			holders.sort(Comparator.comparingInt(Holder::startsAt)
+			add(name, self, false, claim);
+		}
+
+		void add(String name, boolean self, boolean iron, Claim claim)
+		{
+			holders.add(new Holder(name, self, iron, claim));
+			holders.sort(Comparator.comparing((Holder h) -> !h.iron)
+				.thenComparingInt(Holder::startsAt)
 				.thenComparingInt(h -> h.claim.getOrder())
 				.thenComparing(h -> h.name));
+		}
+
+		private int ironmen()
+		{
+			int ironmen = 0;
+			for (Holder holder : holders)
+			{
+				ironmen += holder.iron ? 1 : 0;
+			}
+			return ironmen;
+		}
+
+		private int dosesOfOthers(boolean ironOnly)
+		{
+			int doses = 0;
+			for (Holder holder : holders)
+			{
+				if (!holder.self && (holder.iron || !ironOnly))
+				{
+					doses += holder.claim.getDoses();
+				}
+			}
+			return doses;
+		}
+
+		/** Doses of ironmen other than you, which is what everyone who isn't one has to leave alone. */
+		int dosesOfOtherIronmen()
+		{
+			return dosesOfOthers(true);
+		}
+
+		/** Doses a click on the box takes. An ironman cutting in front of others takes one sip. */
+		int takenOnClick()
+		{
+			int available = availableToMe();
+			return viewerIron && dosesOfOthers(false) > 0 ? Math.min(1, available) : available;
+		}
+
+		/** Behind everyone who already has a share. */
+		int nextOrder()
+		{
+			int order = 0;
+			for (Holder holder : holders)
+			{
+				if (!holder.self)
+				{
+					order = Math.max(order, holder.claim.getOrder());
+				}
+			}
+			return order + 1;
 		}
 
 		Holder me()
@@ -82,17 +152,23 @@ final class PanelState
 			return Math.max(0, Claim.MAX_DOSES - claimedDoses());
 		}
 
-		/** More doses claimed than the potion has, which happens when two people click at once. */
+		/** More doses claimed than the potion has, or two ironmen on one potion. */
 		boolean overclaimed()
 		{
-			return claimedDoses() > Claim.MAX_DOSES;
+			return claimedDoses() > Claim.MAX_DOSES || ironmen() > 1;
 		}
 
-		/** Doses you could hold: everything the others haven't claimed. */
+		/**
+		 * Doses you could hold. Everything the others haven't claimed, and for an ironman everything
+		 * unless another ironman is on it, because the rest give way.
+		 */
 		int availableToMe()
 		{
-			Holder me = me();
-			return Math.max(0, Claim.MAX_DOSES - claimedDoses() + (me == null ? 0 : me.claim.getDoses()));
+			if (viewerIron)
+			{
+				return dosesOfOtherIronmen() > 0 ? 0 : Claim.MAX_DOSES;
+			}
+			return Math.max(0, Claim.MAX_DOSES - dosesOfOthers(false));
 		}
 
 		/** Whether there is more to say than one name: shared, partly claimed or with sip rooms. */
@@ -115,16 +191,17 @@ final class PanelState
 				List<String> shares = new ArrayList<>();
 				for (Holder holder : holders)
 				{
-					shares.add(holder.name + " " + holder.claim.getDoses());
+					shares.add(holder.label() + " " + holder.claim.getDoses());
 				}
-				lines.add("Too many doses claimed: " + String.join(", ", shares));
+				lines.add((ironmen() > 1 ? "Ironmen can't pass a potion to each other: " : "Too many doses claimed: ")
+					+ String.join(", ", shares));
 				return lines;
 			}
 			for (int i = 0; i < holders.size(); i++)
 			{
 				Holder holder = holders.get(i);
 				int doses = holder.claim.getDoses();
-				StringBuilder line = new StringBuilder(holder.name).append(": ");
+				StringBuilder line = new StringBuilder(holder.label()).append(": ");
 				if (i > 0)
 				{
 					line.append("pick up, ");
@@ -141,7 +218,7 @@ final class PanelState
 				}
 				if (i + 1 < holders.size())
 				{
-					line.append(", then drop for ").append(holders.get(i + 1).name);
+					line.append(", then drop for ").append(holders.get(i + 1).label());
 				}
 				else if (freeDoses() > 0)
 				{
@@ -168,6 +245,8 @@ final class PanelState
 	}
 
 	boolean inParty;
+	/** Whether you are an ironman. */
+	boolean iron;
 	boolean countShared;
 	boolean countClaimed;
 	boolean countSplit;
@@ -236,7 +315,7 @@ final class PanelState
 		StringBuilder sb = new StringBuilder().append(inParty);
 		for (Member member : team)
 		{
-			sb.append('|').append(member.name).append(member.self);
+			sb.append('|').append(member.name).append(member.self).append(member.iron);
 			if (member.status != null)
 			{
 				sb.append(member.status.getRoles()).append(member.status.getMissing())
@@ -255,13 +334,13 @@ final class PanelState
 			sb.append('|').append(room.room);
 			for (PotionDrop drop : room.potions)
 			{
-				sb.append(';').append(drop.potion).append(drop.count).append(drop.edited);
+				sb.append(';').append(drop.potion).append(drop.count).append(drop.edited).append(iron);
 				for (SlotView slot : drop.slots)
 				{
 					sb.append(',');
 					for (Holder holder : slot.holders)
 					{
-						sb.append(holder.self).append(holder.name).append(holder.claim).append('/');
+						sb.append(holder.self).append(holder.iron).append(holder.name).append(holder.claim).append('/');
 					}
 				}
 			}

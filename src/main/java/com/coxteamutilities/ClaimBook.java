@@ -15,19 +15,46 @@ final class ClaimBook
 {
 	private final Map<Slot, Claim> claims = new LinkedHashMap<>();
 
-	/** Drops your claim, or claims every dose that's left. */
-	boolean toggle(Slot slot, int available, int nextOrder)
+	/** Drops your claim, or claims this many doses. */
+	boolean toggle(Slot slot, int doses, int nextOrder)
 	{
 		if (claims.remove(slot) != null)
 		{
 			return true;
 		}
-		if (available < 1)
+		if (doses < 1)
 		{
 			return false;
 		}
-		claims.put(slot, new Claim(slot, available, nextOrder, null));
+		claims.put(slot, new Claim(slot, doses, nextOrder, null));
 		return true;
+	}
+
+	/**
+	 * Gives way to ironmen, who have to be the first to hold a potion. Only for those who aren't one.
+	 *
+	 * @param ironDoses doses ironmen have claimed, per potion
+	 * @return whether any of your claims shrank or went
+	 */
+	boolean yieldTo(Map<Slot, Integer> ironDoses)
+	{
+		boolean changed = false;
+		for (Iterator<Map.Entry<Slot, Claim>> it = claims.entrySet().iterator(); it.hasNext(); )
+		{
+			Map.Entry<Slot, Claim> e = it.next();
+			int left = Claim.MAX_DOSES - ironDoses.getOrDefault(e.getKey(), 0);
+			if (left < 1)
+			{
+				it.remove();
+				changed = true;
+			}
+			else if (e.getValue().getDoses() > left)
+			{
+				e.setValue(e.getValue().withDoses(left));
+				changed = true;
+			}
+		}
+		return changed;
 	}
 
 	boolean setDoses(Slot slot, int doses, int available, int nextOrder)

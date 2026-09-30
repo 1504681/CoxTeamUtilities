@@ -20,9 +20,12 @@ public final class MemberStatus
 	private final List<String> missing;
 	private final Map<Slot, Claim> claims;
 	private final Supplies carried;
+	private final boolean iron;
 
-	public MemberStatus(Set<Role> roles, List<String> missing, Map<Slot, Claim> claims, Supplies carried)
+	public MemberStatus(Set<Role> roles, List<String> missing, Map<Slot, Claim> claims, Supplies carried,
+		boolean iron)
 	{
+		this.iron = iron;
 		this.roles = roles;
 		this.missing = missing;
 		this.claims = claims;
@@ -54,7 +57,8 @@ public final class MemberStatus
 				}
 			}
 		}
-		return new MemberStatus(Role.parse(message.getRoles()), missing, claims, Supplies.of(message.getCarried()));
+		return new MemberStatus(Role.parse(message.getRoles()), missing, claims, Supplies.of(message.getCarried()),
+			message.isIron());
 	}
 
 	public Set<Role> getRoles()
@@ -70,6 +74,11 @@ public final class MemberStatus
 	public Collection<Claim> getClaims()
 	{
 		return Collections.unmodifiableCollection(claims.values());
+	}
+
+	public boolean isIron()
+	{
+		return iron;
 	}
 
 	public Supplies getCarried()

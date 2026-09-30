@@ -12,13 +12,16 @@ public class CoxStatusMessage extends PartyMemberMessage
 	private List<String> missing;
 	private List<String> claims;
 	private int[] carried;
+	private boolean iron;
 
 	public CoxStatusMessage()
 	{
 	}
 
-	public CoxStatusMessage(List<String> roles, List<String> missing, List<String> claims, int[] carried)
+	public CoxStatusMessage(List<String> roles, List<String> missing, List<String> claims, int[] carried,
+		boolean iron)
 	{
+		this.iron = iron;
 		this.roles = roles;
 		this.missing = missing;
 		this.claims = claims;
@@ -45,12 +48,18 @@ public class CoxStatusMessage extends PartyMemberMessage
 		return carried;
 	}
 
+	public boolean isIron()
+	{
+		return iron;
+	}
+
 	public boolean sameContent(CoxStatusMessage other)
 	{
 		return other != null
 			&& Objects.equals(roles, other.roles)
 			&& Objects.equals(missing, other.missing)
 			&& Objects.equals(claims, other.claims)
-			&& Arrays.equals(carried, other.carried);
+			&& Arrays.equals(carried, other.carried)
+			&& iron == other.iron;
 	}
 }

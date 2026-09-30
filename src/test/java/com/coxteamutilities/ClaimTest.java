@@ -189,4 +189,86 @@ public class ClaimTest
 		book.dropPast(plan);
 		assertEquals(Collections.singletonList(Claim.whole(VANGUARDS_OVERLOAD, 1)), book.all());
 	}
+
+	@Test
+	public void anIronmanHoldsItFirstWhateverTheRooms()
+	{
+		PanelState.SlotView slot = new PanelState.SlotView();
+		slot.slot = TEKTON_OVERLOAD;
+		slot.add("You", true, new Claim(TEKTON_OVERLOAD, 3, 1, Collections.singletonList(CmRoom.TEKTON)));
+		slot.add("Iron Bob", false, true, new Claim(TEKTON_OVERLOAD, 1, 2, Collections.singletonList(CmRoom.VANGUARDS)));
+		assertEquals(Arrays.asList(
+			"Iron Bob (iron): 1 dose (Vanguards), then drop for You",
+			"You: pick up, 3 doses (Tekton)"), slot.planLines());
+		assertFalse(slot.overclaimed());
+	}
+
+	@Test
+	public void anIronmanCanCutInFrontOfEveryoneElse()
+	{
+		PanelState.SlotView slot = new PanelState.SlotView();
+		slot.slot = TEKTON_OVERLOAD;
+		slot.viewerIron = true;
+		slot.add("Bob", false, Claim.whole(TEKTON_OVERLOAD, 1));
+		assertEquals(4, slot.availableToMe());
+		// one sip, then it goes back to them
+		assertEquals(1, slot.takenOnClick());
+
+		PanelState.SlotView free = new PanelState.SlotView();
+		free.slot = TEKTON_OVERLOAD;
+		free.viewerIron = true;
+		assertEquals(4, free.takenOnClick());
+	}
+
+	@Test
+	public void twoIronmenCannotShareAPotion()
+	{
+		PanelState.SlotView slot = new PanelState.SlotView();
+		slot.slot = TEKTON_OVERLOAD;
+		slot.viewerIron = true;
+		slot.add("Iron Bob", false, true, new Claim(TEKTON_OVERLOAD, 1, 1, null));
+		assertEquals(0, slot.availableToMe());
+		assertEquals(0, slot.takenOnClick());
+		assertFalse(new ClaimBook().toggle(TEKTON_OVERLOAD, slot.takenOnClick(), slot.nextOrder()));
+
+		slot.add("You", true, true, new Claim(TEKTON_OVERLOAD, 1, 1, null));
+		assertTrue(slot.overclaimed());
+		assertEquals(Collections.singletonList(
+			"Ironmen can't pass a potion to each other: Iron Bob (iron) 1, You (iron) 1"), slot.planLines());
+	}
+
+	@Test
+	public void everyoneElseTakesWhatTheIronmanLeaves()
+	{
+		PanelState.SlotView slot = new PanelState.SlotView();
+		slot.slot = TEKTON_OVERLOAD;
+		slot.add("Iron Bob", false, true, new Claim(TEKTON_OVERLOAD, 1, 1, null));
+		assertEquals(3, slot.availableToMe());
+		assertEquals(3, slot.takenOnClick());
+		assertEquals(2, slot.nextOrder());
+		assertEquals(1, slot.dosesOfOtherIronmen());
+	}
+
+	@Test
+	public void claimsGiveWayToIronmen()
+	{
+		ClaimBook book = new ClaimBook();
+		Slot second = new Slot(CmRoom.TEKTON, Potion.OVERLOAD, 1);
+		Slot aid = new Slot(CmRoom.VESPULA, Potion.XERICS_AID, 0);
+		book.setDoses(TEKTON_OVERLOAD, 4, 4, 1);
+		book.setSipRoom(TEKTON_OVERLOAD, CmRoom.TEKTON, true, 4, 1);
+		book.setSipRoom(TEKTON_OVERLOAD, CmRoom.VASA, true, 4, 1);
+		book.toggle(second, 4, 1);
+		book.toggle(aid, 2, 1);
+
+		java.util.Map<Slot, Integer> iron = new java.util.HashMap<>();
+		iron.put(TEKTON_OVERLOAD, 3);
+		iron.put(second, 4);
+		iron.put(aid, 2);
+		assertTrue(book.yieldTo(iron));
+		assertEquals(Arrays.asList("TEKTON:OVERLOAD:0:1:1:TEKTON", "VESPULA:XERICS_AID:0:2:1"),
+			Arrays.asList(book.all().get(0).encode(), book.all().get(1).encode()));
+		assertEquals(2, book.all().size());
+		assertFalse(book.yieldTo(iron));
+	}
 }
