@@ -167,37 +167,39 @@ public final class ChestPlan
 		return parsed;
 	}
 
-	/** What went in and what came out at one visit to a chest, in the order it happened. */
-	public static final class Visit
+	/**
+	 * Adds to or takes from the line for an item, keeping the count in the "Name xN" suffix.
+	 * Only a plain line for the item's base name is touched, never a wildcard; the line is
+	 * added at the end when there is none and dropped when its count reaches zero.
+	 *
+	 * @return whether the lines changed
+	 */
+	public static boolean mark(List<String> lines, String itemName, int delta)
 	{
-		public final List<String> putIn = new ArrayList<>();
-		public final List<String> tookOut = new ArrayList<>();
-
-		/** Records items moving: count above zero went in, below zero came out. */
-		public void moved(String itemName, int count)
+		String name = baseName(itemName);
+		for (int i = 0; i < lines.size(); i++)
 		{
-			List<String> list = count > 0 ? putIn : tookOut;
-			String name = baseName(itemName);
-			int n = Math.abs(count);
-			if (!list.isEmpty())
+			Line line = new Line(lines.get(i));
+			if (line.pattern == null && !line.everything && line.name.equalsIgnoreCase(name))
 			{
-				Line last = new Line(list.get(list.size() - 1));
-				if (last.name.equals(name))
+				int count = line.count + delta;
+				if (count <= 0)
 				{
-					list.set(list.size() - 1, name + " x" + (last.count + n));
-					return;
+					lines.remove(i);
 				}
-			}
-			if (list.size() < MAX_LINES)
-			{
-				list.add(n > 1 ? name + " x" + n : name);
+				else
+				{
+					lines.set(i, count > 1 ? name + " x" + count : name);
+				}
+				return true;
 			}
 		}
-
-		public boolean isEmpty()
+		if (delta > 0 && lines.size() < MAX_LINES)
 		{
-			return putIn.isEmpty() && tookOut.isEmpty();
+			lines.add(delta > 1 ? name + " x" + delta : name);
+			return true;
 		}
+		return false;
 	}
 
 	/**

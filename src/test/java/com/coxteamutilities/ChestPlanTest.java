@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -43,18 +44,18 @@ public class ChestPlanTest
 	}
 
 	@Test
-	public void aVisitRecordsWhatMovedInOrder()
+	public void markingCountsClicksPerItem()
 	{
-		ChestPlan.Visit visit = new ChestPlan.Visit();
-		visit.moved("Elder maul", 1);
-		visit.moved("Xeric's aid(4)", -1);
-		visit.moved("Xeric's aid(3)", -1);
-		visit.moved("Stinkhorn mushroom", -3);
-		visit.moved("Xeric's aid(4)", -1);
-		assertEquals(Collections.singletonList("Elder maul"), visit.putIn);
-		assertEquals(Arrays.asList("Xeric's aid x2", "Stinkhorn mushroom x3", "Xeric's aid"), visit.tookOut);
-		assertFalse(visit.isEmpty());
-		assertTrue(new ChestPlan.Visit().isEmpty());
+		List<String> lines = new ArrayList<>(Collections.singletonList("*chinchompa"));
+		assertTrue(ChestPlan.mark(lines, "Xeric's aid(4)", 1));
+		assertTrue(ChestPlan.mark(lines, "Xeric's aid(3)", 1));
+		assertTrue(ChestPlan.mark(lines, "Black chinchompa", 1));
+		assertEquals(Arrays.asList("*chinchompa", "Xeric's aid x2", "Black chinchompa"), lines);
+		assertTrue(ChestPlan.mark(lines, "Xeric's aid(2)", -1));
+		assertTrue(ChestPlan.mark(lines, "Black chinchompa", -1));
+		assertEquals(Arrays.asList("*chinchompa", "Xeric's aid"), lines);
+		assertFalse(ChestPlan.mark(lines, "Elder maul", -1));
+		assertEquals(Arrays.asList("*chinchompa", "Xeric's aid"), lines);
 	}
 
 	@Test

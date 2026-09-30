@@ -27,6 +27,8 @@ import net.runelite.api.EnumID;
 import net.runelite.api.GameState;
 import net.runelite.api.InstanceTemplates;
 import net.runelite.api.Item;
+import net.runelite.api.MenuAction;
+import net.runelite.api.MenuEntry;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.Player;
 import net.runelite.api.WorldView;
@@ -34,6 +36,7 @@ import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
+import net.runelite.api.events.PostMenuSort;
 import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.events.WidgetClosed;
 import net.runelite.api.events.WidgetLoaded;
@@ -152,12 +155,10 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	private final Map<String, String> roomKeys = new LinkedHashMap<>();
 	private String lastRoomSlot;
 	private final Map<Integer, String> itemNames = new HashMap<>();
-	/** What moved at each chest the last time it was open. */
-	private final Map<String, ChestPlan.Visit> visits = new HashMap<>();
-	/** The visit being recorded while a storage is open. */
-	private ChestPlan.Visit visit;
-	private String visitChest;
-	private volatile boolean recordVisits;
+	/** While on, left-clicking an item in a storage or the inventory adds it to the chest's lists. */
+	private volatile boolean marking;
+	/** The chest picked in the sidebar, marked from the inventory when no storage is open. */
+	private volatile String selectedChest;
 	private volatile Needs needs = Needs.defaults();
 	private volatile Needs needsSolo = Needs.soloDefaults();
 	/** Whether the sidebar shows and edits the solo doses outside a raid. */
@@ -226,7 +227,6 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		overlayManager.add(chestOverlay);
 		overlayManager.add(chestItemOverlay);
 		chests = ChestBook.parse(config.chests(), gson);
-		recordVisits = config.chestRecord();
 
 		wsClient.registerMessage(CoxStatusMessage.class);
 		wsClient.registerMessage(CoxPlanMessage.class);
@@ -250,8 +250,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		currentChest = null;
 		openChest = null;
 		itemNames.clear();
-		visits.clear();
-		visit = null;
+		marking = false;
 		clientToolbar.removeNavigation(navigationButton);
 		overlay.setLines(Collections.emptyList());
 		panel = null;
@@ -356,8 +355,6 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			{
 				saveChests();
 			}
-			visit = new ChestPlan.Visit();
-			visitChest = key;
 			updateOpenChest();
 			refresh();
 		}
@@ -373,7 +370,75 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			closedStorageUntil = client.getTickCount() + 1;
 			openStorage = 0;
 			openChest = null;
-			// the last deposit of a visit can land a tick after the close, so the visit is wrapped up then
+		}
+	}
+
+	/** Puts "Mark" on top of an item's menu while marking, so a left click adds it to the chest's list. */
+	@Subscribe
+	public void onPostMenuSort(PostMenuSort event)
+	{
+		if (!marking)
+		{
+			return;
+		}
+		MenuEntry[] entries = client.getMenu().getMenuEntries();
+		for (MenuEntry entry : entries)
+		{
+			int itemId = entry.getItemId();
+			if (itemId <= 0 || entry.getType() == MenuAction.RUNELITE)
+			{
+				continue;
+			}
+			int group = entry.getParam1() >> 16;
+			boolean deposit;
+			String key;
+			if (group == InterfaceID.RAIDS_STORAGE_PRIVATE || group == InterfaceID.RAIDS_STORAGE_SHARED)
+			{
+				deposit = false;
+				key = currentChest;
+			}
+			else if (group == InterfaceID.RAIDS_STORAGE_SIDE)
+			{
+				deposit = true;
+				key = currentChest;
+			}
+			else if (group == InterfaceID.INVENTORY && openStorage == 0)
+			{
+				deposit = true;
+				key = selectedChest;
+			}
+			else
+			{
+				continue;
+			}
+			if (key == null)
+			{
+				return;
+			}
+			String target = entry.getTarget();
+			String list = deposit ? "put in" : "take out";
+			client.getMenu().createMenuEntry(-1)
+				.setOption("Unmark " + list)
+				.setTarget(target)
+				.setType(MenuAction.RUNELITE)
+				.onClick(e -> markItem(key, deposit, itemId, -1));
+			client.getMenu().createMenuEntry(-1)
+				.setOption("Mark " + list)
+				.setTarget(target)
+				.setType(MenuAction.RUNELITE)
+				.onClick(e -> markItem(key, deposit, itemId, 1));
+			return;
+		}
+	}
+
+	private void markItem(String key, boolean deposit, int itemId, int delta)
+	{
+		ChestPlan plan = chests.getOrCreate(key, chestName(key));
+		if (plan != null && ChestPlan.mark(deposit ? plan.getDeposit() : plan.getWithdraw(), itemName(itemId), delta))
+		{
+			saveChests();
+			updateOpenChest();
+			refresh();
 		}
 	}
 
@@ -422,13 +487,6 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	/** @param moved item id to the count that went into the storage, negative for what came out */
 	private void storageChanged(int storage, Map<Integer, Integer> moved)
 	{
-		if (visit != null)
-		{
-			for (Map.Entry<Integer, Integer> e : moved.entrySet())
-			{
-				visit.moved(itemName(e.getKey()), e.getValue());
-			}
-		}
 		if (storage == InterfaceID.RAIDS_STORAGE_PRIVATE)
 		{
 			for (Map.Entry<Integer, Integer> e : moved.entrySet())
@@ -526,10 +584,6 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 				changed = true;
 			}
 			trackRoom();
-			if (visit != null && openStorage == 0 && client.getTickCount() > closedStorageUntil)
-			{
-				finishVisit();
-			}
 			boolean olmNow = region() == OLM_REGION;
 			if (olmNow && !atOlm && config.olmReminder())
 			{
@@ -662,42 +716,6 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			currentChest = key;
 			refresh();
 		}
-	}
-
-	/** Keeps what moved during the visit and, when recording, makes it the chest's plan. */
-	private void finishVisit()
-	{
-		ChestPlan.Visit done = visit;
-		String key = visitChest;
-		visit = null;
-		visitChest = null;
-		if (key == null || done.isEmpty())
-		{
-			return;
-		}
-		synchronized (lock)
-		{
-			visits.put(key, done);
-		}
-		if (recordVisits)
-		{
-			applyVisit(key, done);
-		}
-		refresh();
-	}
-
-	private void applyVisit(String key, ChestPlan.Visit done)
-	{
-		ChestPlan plan = chests.getOrCreate(key, chestName(key));
-		if (plan == null)
-		{
-			return;
-		}
-		plan.getDeposit().clear();
-		plan.getDeposit().addAll(done.putIn);
-		plan.getWithdraw().clear();
-		plan.getWithdraw().addAll(done.tookOut);
-		saveChests();
 	}
 
 	/** "Farming 2", "Ice Demon" from a key like RAIDS_FARMING#2. */
@@ -1174,30 +1192,19 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	}
 
 	@Override
-	public void useLastVisit(String key)
+	public void setMarking(boolean on)
 	{
-		ChestPlan.Visit done;
-		synchronized (lock)
+		if (marking != on)
 		{
-			done = visits.get(key);
-		}
-		if (done != null)
-		{
-			applyVisit(key, done);
-			clientThread.invokeLater(this::updateOpenChest);
+			marking = on;
 			refresh();
 		}
 	}
 
 	@Override
-	public void setRecordVisits(boolean record)
+	public void selectChest(String key)
 	{
-		if (recordVisits != record)
-		{
-			recordVisits = record;
-			configManager.setConfiguration(CoxTeamUtilitiesConfig.GROUP, CoxTeamUtilitiesConfig.KEY_CHEST_RECORD, record);
-			refresh();
-		}
+		selectedChest = key;
 	}
 
 	@Override
@@ -1219,6 +1226,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			roles.clear();
 			claims.clear();
 		}
+		marking = false;
 		configManager.setConfiguration(CoxTeamUtilitiesConfig.GROUP, CoxTeamUtilitiesConfig.KEY_ROLES, "");
 		rolesChanged();
 	}
@@ -1406,11 +1414,10 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		state.units = config.needUnits();
 		state.chests = chests.copy(gson);
 		state.currentChest = currentChest;
-		state.recordVisits = recordVisits;
+		state.marking = marking;
 		synchronized (lock)
 		{
 			state.inventoryNames = inventoryNames;
-			state.visits.putAll(visits);
 		}
 		state.separateSoloNeeds = config.separateSoloNeeds();
 		state.trackStamina = config.trackStamina();

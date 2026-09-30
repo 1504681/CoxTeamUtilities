@@ -58,11 +58,11 @@ class CoxTeamPanel extends PluginPanel
 		/** Replaces a chest's deposit (true) or withdraw (false) list with the lines of the text. */
 		void setChestLines(String key, boolean deposit, String text);
 
-		/** Makes what happened at the last visit to the chest its plan. */
-		void useLastVisit(String key);
+		/** Whether clicking items in a storage or the inventory adds them to the chest's lists. */
+		void setMarking(boolean on);
 
-		/** Whether every visit to a chest rewrites its plan. */
-		void setRecordVisits(boolean record);
+		/** The chest shown in the sidebar, which inventory items are marked for when no storage is open. */
+		void selectChest(String key);
 
 		void deleteChest(String key);
 
@@ -154,9 +154,7 @@ class CoxTeamPanel extends PluginPanel
 	private final Stack chestSteps = new Stack(null);
 	private String selectedChest;
 	private final JLabel chestHere = small("", MUTED);
-	private final JCheckBox chestRecord = new JCheckBox("Record visits");
-	private final JLabel chestVisit = wrapped("", MUTED);
-	private JLabel chestUseVisit;
+	private final JCheckBox chestMark = new JCheckBox("Mark by clicking");
 	private final JPanel chestEditor = new JPanel(new BorderLayout());
 	private final List<String> chestKeys = new ArrayList<>();
 	private String lastCurrentChest;
@@ -440,19 +438,19 @@ class CoxTeamPanel extends PluginPanel
 	{
 		chestsBody.setBorder(new EmptyBorder(6, 6, 6, 6));
 		chestsBody.addRow(chestHere, 0);
-		chestRecord.setOpaque(false);
-		chestRecord.setFont(FontManager.getRunescapeSmallFont());
-		chestRecord.setForeground(Color.WHITE);
-		chestRecord.setToolTipText("<html>Each time you close a storage, what you put in and took out becomes that chest's plan."
-			+ "<br>Do a raid the way you want it once, then turn this off.</html>");
-		chestRecord.addActionListener(e ->
+		chestMark.setOpaque(false);
+		chestMark.setFont(FontManager.getRunescapeSmallFont());
+		chestMark.setForeground(Color.WHITE);
+		chestMark.setToolTipText("<html>While on, left-clicking an item in a storage adds it to Take out and one in your inventory to Put in."
+			+ "<br>Each click adds one more; Unmark on the right-click menu takes one away. Off again when you TYFR.</html>");
+		chestMark.addActionListener(e ->
 		{
 			if (!updating)
 			{
-				actions.setRecordVisits(chestRecord.isSelected());
+				actions.setMarking(chestMark.isSelected());
 			}
 		});
-		chestsBody.addRow(chestRecord, 2);
+		chestsBody.addRow(chestMark, 2);
 
 		chestChooser.setFont(FontManager.getRunescapeSmallFont());
 		chestChooser.setPreferredSize(new Dimension(100, 24));
@@ -462,6 +460,7 @@ class CoxTeamPanel extends PluginPanel
 			if (!updating && index >= 0 && index < chestKeys.size())
 			{
 				selectedChest = chestKeys.get(index);
+				actions.selectChest(selectedChest);
 				showChest(lastState);
 			}
 		});
@@ -490,19 +489,6 @@ class CoxTeamPanel extends PluginPanel
 		editor.addRow(listArea(chestDeposit, true), 2);
 		editor.addRow(small("Take out", Color.WHITE), 6);
 		editor.addRow(listArea(chestWithdraw, false), 2);
-		chestUseVisit = chip("Use last visit", ColorScheme.DARK_GRAY_COLOR,
-			"Make what you put in and took out last time this chest's plan", () ->
-			{
-				if (selectedChest != null)
-				{
-					actions.useLastVisit(selectedChest);
-				}
-			});
-		JPanel visitRow = new JPanel(new BorderLayout(4, 0));
-		visitRow.setOpaque(false);
-		visitRow.add(chestVisit, BorderLayout.CENTER);
-		visitRow.add(chestUseVisit, BorderLayout.EAST);
-		editor.addRow(visitRow, 6);
 		editor.addRow(chestSteps, 6);
 		chestEditor.setOpaque(false);
 		chestEditor.add(editor, BorderLayout.CENTER);
@@ -568,7 +554,8 @@ class CoxTeamPanel extends PluginPanel
 			chestChooser.addItem(plan.getName().isEmpty() ? plan.getKey() : plan.getName());
 		}
 		chestEditor.setVisible(!plans.isEmpty());
-		chestRecord.setSelected(state.recordVisits);
+		chestMark.setSelected(state.marking);
+		actions.selectChest(selectedChest);
 		if (plans.isEmpty())
 		{
 			chestHere.setText("<html>Open a storage unit in a raid and it shows up here, with a list of what to put in and take out.</html>");
@@ -602,11 +589,6 @@ class CoxTeamPanel extends PluginPanel
 		chestOrdered.setSelected(plan.isOrdered());
 		setIfIdle(chestDeposit, String.join("\n", plan.getDeposit()));
 		setIfIdle(chestWithdraw, String.join("\n", plan.getWithdraw()));
-		ChestPlan.Visit visit = state.visits.get(plan.getKey());
-		chestVisit.setText(visit == null ? "No visit yet this session" : "<html><body style='width:100px'>Last visit: in "
-			+ escape(visit.putIn.isEmpty() ? "nothing" : String.join(", ", visit.putIn)) + "; out "
-			+ escape(visit.tookOut.isEmpty() ? "nothing" : String.join(", ", visit.tookOut)) + "</body></html>");
-		chestUseVisit.setVisible(visit != null);
 
 		chestSteps.clear();
 		if (plan.getKey().equals(state.currentChest))

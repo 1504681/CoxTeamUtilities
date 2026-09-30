@@ -19,7 +19,6 @@ public interface CoxTeamUtilitiesConfig extends Config
 	String KEY_NEEDS_SOLO = "needsSolo";
 	String KEY_NEEDS_TAB_SOLO = "needsTabSolo";
 	String KEY_CHESTS = "chests";
-	String KEY_CHEST_RECORD = "chestRecord";
 
 	@ConfigSection(
 		name = "Supplies",
@@ -269,17 +268,6 @@ public interface CoxTeamUtilitiesConfig extends Config
 	default String chests()
 	{
 		return "";
-	}
-
-	@ConfigItem(
-		keyName = KEY_CHEST_RECORD,
-		name = "Record visits",
-		description = "Whether each visit to a chest rewrites its plan, toggled in the sidebar",
-		hidden = true
-	)
-	default boolean chestRecord()
-	{
-		return false;
 	}
 
 	@ConfigItem(

@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -267,8 +266,8 @@ final class PanelState
 	String currentChest;
 	List<String> inventoryNames = new ArrayList<>();
 	/** What happened at each chest the last time its storage was open, this session. */
-	final Map<String, ChestPlan.Visit> visits = new HashMap<>();
-	boolean recordVisits;
+	/** Whether clicking items in a storage or the inventory adds them to the chest's lists. */
+	boolean marking;
 
 	final Set<Role> roles = EnumSet.noneOf(Role.class);
 	final Map<Role, List<String>> missing = new EnumMap<>(Role.class);

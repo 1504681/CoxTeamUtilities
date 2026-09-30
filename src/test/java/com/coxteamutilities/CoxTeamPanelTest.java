@@ -60,12 +60,12 @@ public class CoxTeamPanelTest
 		}
 
 		@Override
-		public void useLastVisit(String key)
+		public void setMarking(boolean on)
 		{
 		}
 
 		@Override
-		public void setRecordVisits(boolean record)
+		public void selectChest(String key)
 		{
 		}
 
@@ -122,11 +122,7 @@ public class CoxTeamPanelTest
 		farm.getWithdraw().addAll(Arrays.asList("Xeric's aid x2", "Stinkhorn mushroom x3", "Noxifer"));
 		farm.setOrdered(true);
 		state.currentChest = "RAIDS_FARMING#1";
-		ChestPlan.Visit visit = new ChestPlan.Visit();
-		visit.moved("Elder maul", 1);
-		visit.moved("Xeric's aid(4)", -1);
-		visit.moved("Xeric's aid(4)", -1);
-		state.visits.put("RAIDS_FARMING#1", visit);
+		state.marking = true;
 		state.inventoryNames = Arrays.asList("Xeric's aid(4)", "Xeric's aid(3)", "Stinkhorn mushroom");
 		state.roles.addAll(EnumSet.of(Role.MUTTADILE_ZGS, Role.MUTTADILE_ENTANGLE, Role.TIGHTROPE_LURER));
 		state.missing.put(Role.MUTTADILE_ENTANGLE, Arrays.asList("Standard spellbook", "Nature runes"));
