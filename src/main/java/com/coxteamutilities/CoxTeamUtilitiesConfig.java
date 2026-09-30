@@ -13,6 +13,8 @@ public interface CoxTeamUtilitiesConfig extends Config
 	String KEY_ROLES = "roles";
 	String KEY_PLAN = "plan";
 	String KEY_NEEDS = "needs";
+	String KEY_NEEDS_SOLO = "needsSolo";
+	String KEY_NEEDS_TAB_SOLO = "needsTabSolo";
 
 	@ConfigSection(
 		name = "Supplies",
@@ -27,6 +29,30 @@ public interface CoxTeamUtilitiesConfig extends Config
 		position = 1
 	)
 	String reminderSection = "reminders";
+
+	@ConfigItem(
+		keyName = "needUnits",
+		name = "Show supplies as",
+		description = "Whether the supply rows and the doses-needed table are in doses or in potions (4 doses)",
+		section = needSection,
+		position = 0
+	)
+	default NeedUnits needUnits()
+	{
+		return NeedUnits.DOSES;
+	}
+
+	@ConfigItem(
+		keyName = "separateSoloNeeds",
+		name = "Separate doses for solo raids",
+		description = "Keep a second doses-needed table for solo raids. Off means solos use the team numbers",
+		section = needSection,
+		position = 1
+	)
+	default boolean separateSoloNeeds()
+	{
+		return false;
+	}
 
 	@ConfigItem(
 		keyName = "countClaimed",
@@ -101,6 +127,18 @@ public interface CoxTeamUtilitiesConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "olmReminder",
+		name = "Olm entry reminder",
+		description = "Chat message with what you're still short when you enter Olm",
+		section = reminderSection,
+		position = 5
+	)
+	default boolean olmReminder()
+	{
+		return true;
+	}
+
+	@ConfigItem(
 		keyName = "chatReminder",
 		name = "Chat message on entry",
 		description = "Put missing items in the chatbox when you enter the raid. Only you see it.",
@@ -144,6 +182,28 @@ public interface CoxTeamUtilitiesConfig extends Config
 	default String needs()
 	{
 		return "";
+	}
+
+	@ConfigItem(
+		keyName = KEY_NEEDS_SOLO,
+		name = "Doses needed, solo",
+		description = "Doses needed per room in a solo raid, edited in the sidebar",
+		hidden = true
+	)
+	default String needsSolo()
+	{
+		return "";
+	}
+
+	@ConfigItem(
+		keyName = KEY_NEEDS_TAB_SOLO,
+		name = "Solo tab",
+		description = "Which doses-needed table the sidebar shows outside a raid",
+		hidden = true
+	)
+	default boolean needsTabSolo()
+	{
+		return false;
 	}
 
 	@ConfigItem(

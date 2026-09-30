@@ -24,6 +24,7 @@ import net.runelite.api.GameState;
 import net.runelite.api.Item;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.Player;
+import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.VarbitChanged;
@@ -62,6 +63,8 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 
 	/** The raid lobby on Mount Quidamortem. */
 	private static final int LOBBY_REGION = 4919;
+	/** The Great Olm's chamber. */
+	private static final int OLM_REGION = 12889;
 	/** Ticks outside before a raid counts as left, so a relog or a reload doesn't wipe the raid's state. */
 	private static final int LEAVE_TICKS = 5;
 	/** Least ticks between two status messages to the party. */
@@ -120,6 +123,9 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 
 	private final DropPlan plan = new DropPlan();
 	private volatile NeedPlan needs = NeedPlan.defaults();
+	private volatile NeedPlan needsSolo = NeedPlan.soloDefaults();
+	/** Which table the sidebar shows and edits outside a raid. */
+	private volatile boolean needsTabSolo;
 
 	/** Guards everything below that the Swing, client and party threads share. */
 	private final Object lock = new Object();
@@ -134,6 +140,8 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	// client thread only
 	private Item[] privateItems = new Item[0];
 	private boolean inRaid;
+	private boolean soloRaid;
+	private boolean atOlm;
 	private int ticksOutside;
 	private int ticksSinceSend = SEND_INTERVAL;
 	private CoxStatusMessage lastSent;
@@ -158,7 +166,9 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			roles.addAll(Role.parse(split(config.roles())));
 		}
 		plan.merge(split(config.plan()));
-		needs = NeedPlan.parse(config.needs());
+		needs = NeedPlan.parse(config.needs(), NeedPlan.defaults());
+		needsSolo = NeedPlan.parse(config.needsSolo(), NeedPlan.soloDefaults());
+		needsTabSolo = config.needsTabSolo();
 
 		panel = new CoxTeamPanel(this, (label, itemId) -> itemManager.getImage(itemId).addTo(label));
 		navigationButton = NavigationButton.builder()
@@ -306,6 +316,18 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 				// what the client still holds is from an earlier raid until the storage is opened
 				loadoutDirty = true;
 			}
+			boolean soloNow = client.getVarbitValue(VarbitID.RAIDS_CLIENT_PARTYSIZE) <= 1;
+			if (soloNow != soloRaid)
+			{
+				soloRaid = soloNow;
+				changed = true;
+			}
+			boolean olmNow = region() == OLM_REGION;
+			if (olmNow && !atOlm && config.olmReminder())
+			{
+				remindAtOlm();
+			}
+			atOlm = olmNow;
 		}
 		else if (inRaid && ++ticksOutside >= LEAVE_TICKS)
 		{
@@ -355,12 +377,48 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		{
 			return config.overlayDuringRaid() || client.getVarbitValue(VarbitID.RAIDS_CLIENT_PROGRESS) == 0;
 		}
+		return region() == LOBBY_REGION;
+	}
+
+	/** Region of the local player, the template's region inside an instance, -1 when not logged in. */
+	private int region()
+	{
 		Player player = client.getLocalPlayer();
-		return player != null && player.getWorldLocation().getRegionID() == LOBBY_REGION;
+		if (player == null)
+		{
+			return -1;
+		}
+		return WorldPoint.fromLocalInstance(client, player.getLocalLocation()).getRegionID();
+	}
+
+	/** Whether the numbers should be the solo ones right now. */
+	private boolean solo()
+	{
+		return inRaid ? soloRaid : needsTabSolo;
+	}
+
+	/** The table for the solo tab, or for solo raids, when the plans are kept apart. */
+	private NeedPlan needsFor(boolean solo)
+	{
+		return solo && config.separateSoloNeeds() ? needsSolo : needs;
+	}
+
+	private void remindAtOlm()
+	{
+		String shortfalls = snapshot().shortfalls();
+		if (!shortfalls.isEmpty())
+		{
+			chatMessageManager.queue(QueuedMessage.builder()
+				.type(ChatMessageType.CONSOLE)
+				.runeLiteFormattedMessage("Short for Olm: " + shortfalls)
+				.build());
+		}
 	}
 
 	private void leftRaid()
 	{
+		soloRaid = false;
+		atOlm = false;
 		privateItems = new Item[0];
 		synchronized (lock)
 		{
@@ -675,9 +733,22 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	@Override
 	public void setNeed(CmRoom room, Potion potion, int doses)
 	{
-		if (needs.set(room, potion, doses))
+		NeedPlan plan = needsFor(needsTabSolo);
+		if (plan.set(room, potion, doses))
 		{
-			configManager.setConfiguration(CoxTeamUtilitiesConfig.GROUP, CoxTeamUtilitiesConfig.KEY_NEEDS, needs.encode());
+			configManager.setConfiguration(CoxTeamUtilitiesConfig.GROUP,
+				plan == needsSolo ? CoxTeamUtilitiesConfig.KEY_NEEDS_SOLO : CoxTeamUtilitiesConfig.KEY_NEEDS, plan.encode());
+			refresh();
+		}
+	}
+
+	@Override
+	public void setNeedsTab(boolean solo)
+	{
+		if (needsTabSolo != solo)
+		{
+			needsTabSolo = solo;
+			configManager.setConfiguration(CoxTeamUtilitiesConfig.GROUP, CoxTeamUtilitiesConfig.KEY_NEEDS_TAB_SOLO, solo);
 			refresh();
 		}
 	}
@@ -824,10 +895,13 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		state.countShared = config.countShared();
 		state.countClaimed = config.countClaimed();
 		state.countSplit = config.countSplit();
-		state.needs = needs.copy();
+		state.units = config.needUnits();
+		state.separateSoloNeeds = config.separateSoloNeeds();
+		state.solo = solo();
+		state.needs = needsFor(state.solo).copy();
 		for (Potion potion : Potion.values())
 		{
-			state.need.put(potion, state.needs.total(potion));
+			state.need.put(potion, state.applies(potion) ? state.needs.total(potion) : 0);
 		}
 
 		PartyMember local = party.getLocalMember();

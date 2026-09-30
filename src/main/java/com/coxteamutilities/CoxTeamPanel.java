@@ -5,6 +5,7 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
@@ -19,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import javax.swing.JCheckBox;
 import javax.swing.JCheckBoxMenuItem;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
@@ -38,6 +40,9 @@ class CoxTeamPanel extends PluginPanel
 		void setRole(Role role, boolean selected);
 
 		void setNeed(CmRoom room, Potion potion, int doses);
+
+		/** Switches the doses-needed table between the team and the solo numbers. */
+		void setNeedsTab(boolean solo);
 
 		void setDropCount(CmRoom room, Potion potion, int count);
 
@@ -115,6 +120,11 @@ class CoxTeamPanel extends PluginPanel
 	private final Map<Potion, JLabel> needLabels = new EnumMap<>(Potion.class);
 	private final Map<CmRoom, Map<Potion, JTextField>> needFields = new EnumMap<>(CmRoom.class);
 	private final Map<CmRoom, JLabel> roomLabels = new EnumMap<>(CmRoom.class);
+	private final Map<Potion, JComponent> supplyRows = new EnumMap<>(Potion.class);
+	private final Map<Potion, JLabel> needHeads = new EnumMap<>(Potion.class);
+	private final JLabel teamTab = small("Team", Color.WHITE);
+	private final JLabel soloTab = small("Solo", MUTED);
+	private NeedUnits units = NeedUnits.DOSES;
 	private final JPanel needsBody = new JPanel();
 	private final JLabel needsToggle = small("", MUTED);
 	private final Map<Role, JCheckBox> roleBoxes = new EnumMap<>(Role.class);
@@ -253,7 +263,7 @@ class CoxTeamPanel extends PluginPanel
 			JLabel need = new JLabel("0", SwingConstants.CENTER);
 			need.setFont(FontManager.getRunescapeBoldFont());
 			need.setForeground(Color.WHITE);
-			need.setToolTipText("Doses of " + potion.getDisplayName() + " you want over the raid, from the rooms below");
+			need.setToolTipText(potion.getDisplayName() + " you want over the raid, from the rooms below");
 			needLabels.put(potion, need);
 			JPanel needHolder = new JPanel(new BorderLayout());
 			needHolder.setOpaque(false);
@@ -266,6 +276,7 @@ class CoxTeamPanel extends PluginPanel
 			row.add(icon, BorderLayout.WEST);
 			row.add(text, BorderLayout.CENTER);
 			row.add(needHolder, BorderLayout.EAST);
+			supplyRows.put(potion, row);
 			body.addRow(row, first ? 0 : 6);
 			first = false;
 		}
@@ -278,12 +289,29 @@ class CoxTeamPanel extends PluginPanel
 	{
 		JPanel header = new JPanel(new BorderLayout());
 		header.setOpaque(false);
-		JLabel title = small("Doses needed per room", Color.WHITE);
+		JLabel title = small("Needed per room", Color.WHITE);
 		header.add(title, BorderLayout.WEST);
-		header.add(needsToggle, BorderLayout.EAST);
-		header.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		header.setToolTipText("What you drink where. The totals are what the rows above compare against.");
-		header.addMouseListener(new MouseAdapter()
+		JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+		right.setOpaque(false);
+		for (JLabel tab : new JLabel[]{teamTab, soloTab})
+		{
+			tab.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+			tab.addMouseListener(new MouseAdapter()
+			{
+				@Override
+				public void mousePressed(MouseEvent e)
+				{
+					actions.setNeedsTab(tab == soloTab);
+				}
+			});
+			right.add(tab);
+		}
+		right.add(needsToggle);
+		header.add(right, BorderLayout.EAST);
+		title.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		title.setToolTipText("What you drink where. The totals are what the rows above compare against.");
+		needsToggle.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		MouseAdapter fold = new MouseAdapter()
 		{
 			@Override
 			public void mousePressed(MouseEvent e)
@@ -293,7 +321,9 @@ class CoxTeamPanel extends PluginPanel
 				revalidate();
 				repaint();
 			}
-		});
+		};
+		title.addMouseListener(fold);
+		needsToggle.addMouseListener(fold);
 		needsToggle.setText("hide");
 
 		needsBody.setLayout(new GridBagLayout());
@@ -315,6 +345,7 @@ class CoxTeamPanel extends PluginPanel
 				JLabel head = small(potion.getShortName(), MUTED);
 				head.setHorizontalAlignment(SwingConstants.CENTER);
 				head.setToolTipText(potion.getDisplayName());
+				needHeads.put(potion, head);
 				needsBody.add(head, c);
 			}
 		}
@@ -323,7 +354,7 @@ class CoxTeamPanel extends PluginPanel
 			c.gridy++;
 			c.gridx = 0;
 			c.weightx = 1;
-			JLabel label = small(room.getDisplayName(), Color.WHITE);
+			JLabel label = small(room.getShortName(), Color.WHITE);
 			roomLabels.put(room, label);
 			needsBody.add(label, c);
 			c.weightx = 0;
@@ -335,24 +366,14 @@ class CoxTeamPanel extends PluginPanel
 					continue;
 				}
 				c.gridx++;
-				JTextField field = new JTextField("0", 2);
+				JTextField field = new JTextField("0");
 				field.setFont(FontManager.getRunescapeSmallFont());
+				field.setPreferredSize(new Dimension(29, 19));
+				field.setMinimumSize(field.getPreferredSize());
 				field.setHorizontalAlignment(SwingConstants.CENTER);
 				field.setMargin(new Insets(1, 1, 1, 1));
-				field.setToolTipText(potion.getDisplayName() + " doses to drink at " + room.getDisplayName());
-				Runnable commit = () ->
-				{
-					int doses;
-					try
-					{
-						doses = Integer.parseInt(field.getText().trim());
-					}
-					catch (NumberFormatException ex)
-					{
-						doses = 0;
-					}
-					actions.setNeed(room, potion, doses);
-				};
+				field.setToolTipText(potion.getDisplayName() + " to drink at " + room.getDisplayName());
+				Runnable commit = () -> actions.setNeed(room, potion, units.parse(field.getText()));
 				field.addActionListener(e -> commit.run());
 				field.addFocusListener(new FocusAdapter()
 				{
@@ -449,8 +470,10 @@ class CoxTeamPanel extends PluginPanel
 
 	private void updateSupplies(PanelState state)
 	{
+		units = state.units;
 		for (Potion potion : haveLabels.keySet())
 		{
+			supplyRows.get(potion).setVisible(state.applies(potion));
 			int need = state.need.getOrDefault(potion, 0);
 			int have = state.have(potion);
 			int shortfall = state.shortfall(potion);
@@ -458,26 +481,26 @@ class CoxTeamPanel extends PluginPanel
 			JLabel label = haveLabels.get(potion);
 			if (need == 0)
 			{
-				label.setText(have + " doses");
+				label.setText(units.format(have) + " " + units.getWord());
 				label.setForeground(Color.WHITE);
 			}
 			else if (shortfall == 0)
 			{
-				label.setText(have + " / " + need + " doses");
+				label.setText(units.format(have) + " / " + units.format(need) + " " + units.getWord());
 				label.setForeground(GOOD);
 			}
 			else
 			{
-				label.setText(have + " / " + need + ", short " + shortfall);
+				label.setText(units.format(have) + " / " + units.format(need) + ", short " + units.format(shortfall));
 				label.setForeground(BAD);
 			}
 
-			String inventory = "inv " + state.inventory.doses(potion);
-			String stored = "private " + (state.privateStorage == null ? "?" : state.privateStorage.doses(potion));
-			String shared = "shared " + (state.sharedStorage == null ? "?" : state.sharedStorage.doses(potion));
-			String claimed = "claimed " + state.claimed.doses(potion);
-			String split = potion != Potion.OVERLOAD ? "" : "<br>split overload " + state.splitHeld() + " held, "
-				+ state.claimed.doses(Potion.SPLIT_OVERLOAD) + " claimed" + (state.countSplit ? "" : " (not counted)");
+			String inventory = "inv " + units.format(state.inventory.doses(potion));
+			String stored = "private " + (state.privateStorage == null ? "?" : units.format(state.privateStorage.doses(potion)));
+			String shared = "shared " + (state.sharedStorage == null ? "?" : units.format(state.sharedStorage.doses(potion)));
+			String claimed = "claimed " + units.format(state.claimed.doses(potion));
+			String split = potion != Potion.OVERLOAD ? "" : "<br>split overload " + units.format(state.splitHeld()) + " held, "
+				+ units.format(state.claimed.doses(Potion.SPLIT_OVERLOAD)) + " claimed" + (state.countSplit ? "" : " (not counted)");
 			JLabel detail = detailLabels.get(potion);
 			detail.setText(inventory + "  " + stored);
 			moreLabels.get(potion).setText(shared + "  " + claimed);
@@ -486,27 +509,41 @@ class CoxTeamPanel extends PluginPanel
 			label.setToolTipText(detail.getToolTipText());
 			moreLabels.get(potion).setToolTipText(detail.getToolTipText());
 
-			needLabels.get(potion).setText(String.valueOf(need));
+			needLabels.get(potion).setText(units.format(need));
 		}
 		updateNeeds(state);
 	}
 
 	private void updateNeeds(PanelState state)
 	{
+		teamTab.setForeground(state.solo ? MUTED : Color.WHITE);
+		soloTab.setForeground(state.solo ? Color.WHITE : MUTED);
+		String same = state.separateSoloNeeds ? "" : "<br>Same numbers for both until 'Separate doses for solo raids' is on in the settings";
+		teamTab.setToolTipText("<html>What you need in a team raid" + same + "</html>");
+		soloTab.setToolTipText("<html>What you need in a solo raid, stamina included" + same + "</html>");
+		for (Map.Entry<Potion, JLabel> head : needHeads.entrySet())
+		{
+			head.getValue().setVisible(state.applies(head.getKey()));
+		}
 		for (Map.Entry<CmRoom, Map<Potion, JTextField>> room : needFields.entrySet())
 		{
 			StringBuilder fromHere = new StringBuilder("<html>From " + room.getKey().getDisplayName()
-				+ " on you still drink:");
+				+ " on you still drink (" + units.getWord() + "):");
 			for (Map.Entry<Potion, JTextField> e : room.getValue().entrySet())
 			{
-				String value = String.valueOf(state.needs.get(room.getKey(), e.getKey()));
 				JTextField field = e.getValue();
+				field.setVisible(state.applies(e.getKey()));
+				String value = units.format(state.needs.get(room.getKey(), e.getKey()));
 				if (!field.hasFocus() && !field.getText().equals(value))
 				{
 					field.setText(value);
 				}
+				if (!field.isVisible())
+				{
+					continue;
+				}
 				fromHere.append("<br>").append(e.getKey().getDisplayName()).append(' ')
-					.append(state.needs.fromRoomOn(room.getKey(), e.getKey()));
+					.append(units.format(state.needs.fromRoomOn(room.getKey(), e.getKey())));
 			}
 			roomLabels.get(room.getKey()).setToolTipText(fromHere.append("</html>").toString());
 		}
@@ -580,14 +617,14 @@ class CoxTeamPanel extends PluginPanel
 			StringBuilder carried = new StringBuilder();
 			for (Potion potion : Potion.values())
 			{
-				if (potion.isSupply())
+				if (potion.isSupply() && !potion.isSoloOnly())
 				{
 					carried.append(carried.length() == 0 ? "" : "  ")
-						.append(potion.getShortName()).append(' ').append(status.getCarried().doses(potion));
+						.append(potion.getShortName()).append(' ').append(units.format(status.getCarried().doses(potion)));
 				}
 			}
 			JLabel doses = small(carried.toString(), MUTED);
-			doses.setToolTipText("Doses in their inventory and private storage");
+			doses.setToolTipText(units + " in their inventory and private storage");
 			teamBody.addRow(doses, 0);
 		}
 	}

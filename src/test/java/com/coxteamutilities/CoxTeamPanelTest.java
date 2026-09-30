@@ -35,6 +35,11 @@ public class CoxTeamPanelTest
 		}
 
 		@Override
+		public void setNeedsTab(boolean solo)
+		{
+		}
+
+		@Override
 		public void setDropCount(CmRoom room, Potion potion, int count)
 		{
 		}
@@ -69,7 +74,9 @@ public class CoxTeamPanelTest
 		state.inventory = Supplies.of(new int[]{4, 8, 4, 0});
 		state.privateStorage = Supplies.of(new int[]{0, 4, 0, 4});
 		state.claimed = Supplies.of(new int[]{4, 0, 0, 0});
-		state.needs = NeedPlan.defaults();
+		state.needs = NeedPlan.soloDefaults();
+		state.solo = true;
+		state.units = NeedUnits.POTIONS;
 		state.needs.set(CmRoom.TEKTON, Potion.OVERLOAD, 1);
 		state.needs.set(CmRoom.VANGUARDS, Potion.OVERLOAD, 1);
 		state.needs.set(CmRoom.VANGUARDS, Potion.XERICS_AID, 4);

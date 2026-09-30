@@ -22,23 +22,32 @@ public final class NeedPlan
 	{
 	}
 
-	/** A sensible first plan: everything at Olm. */
+	/** A first plan for a team: everything at Olm. */
 	public static NeedPlan defaults()
 	{
 		NeedPlan plan = new NeedPlan();
 		plan.set(CmRoom.OLM, Potion.OVERLOAD, 4);
-		plan.set(CmRoom.OLM, Potion.XERICS_AID, 12);
-		plan.set(CmRoom.OLM, Potion.REVITALISATION, 8);
+		plan.set(CmRoom.OLM, Potion.XERICS_AID, 24);
+		plan.set(CmRoom.OLM, Potion.REVITALISATION, 12);
 		plan.set(CmRoom.OLM, Potion.PRAYER_ENHANCE, 4);
 		return plan;
 	}
 
-	/** The defaults for something never stored, otherwise whatever parses. */
-	public static NeedPlan parse(String encoded)
+	/** A first plan for a solo: more running, so a stamina and another revitalisation. */
+	public static NeedPlan soloDefaults()
+	{
+		NeedPlan plan = defaults();
+		plan.set(CmRoom.OLM, Potion.REVITALISATION, 16);
+		plan.set(CmRoom.OLM, Potion.STAMINA, 4);
+		return plan;
+	}
+
+	/** The given defaults for something never stored, otherwise whatever parses. */
+	public static NeedPlan parse(String encoded, NeedPlan defaults)
 	{
 		if (encoded == null || encoded.isEmpty())
 		{
-			return defaults();
+			return defaults;
 		}
 		NeedPlan plan = new NeedPlan();
 		for (String entry : encoded.split(","))
@@ -78,7 +87,7 @@ public final class NeedPlan
 
 	public synchronized NeedPlan copy()
 	{
-		return parse(encode());
+		return parse(encode(), new NeedPlan());
 	}
 
 	public synchronized int get(CmRoom room, Potion potion)

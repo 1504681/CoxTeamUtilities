@@ -257,7 +257,12 @@ final class PanelState
 	Supplies sharedStorage;
 	Supplies claimed = Supplies.EMPTY;
 	final Map<Potion, Integer> need = new EnumMap<>(Potion.class);
+	/** The table being shown: the solo one when solo is set and the plans are separate. */
 	NeedPlan needs = new NeedPlan();
+	/** Whether the numbers are for a solo raid: the raid's size while in one, the tab otherwise. */
+	boolean solo;
+	boolean separateSoloNeeds;
+	NeedUnits units = NeedUnits.DOSES;
 
 	final Set<Role> roles = EnumSet.noneOf(Role.class);
 	final Map<Role, List<String>> missing = new EnumMap<>(Role.class);
@@ -310,10 +315,32 @@ final class PanelState
 		return Math.max(0, need.getOrDefault(potion, 0) - have(potion));
 	}
 
+	/** Whether the supply row for this potion applies right now. */
+	boolean applies(Potion potion)
+	{
+		return potion.isSupply() && (solo || !potion.isSoloOnly());
+	}
+
+	/** "Xeric's aid 8 doses, Stamina 1 potion" for everything short, empty when nothing is. */
+	String shortfalls()
+	{
+		StringBuilder text = new StringBuilder();
+		for (Potion potion : Potion.values())
+		{
+			int shortfall = applies(potion) ? shortfall(potion) : 0;
+			if (shortfall > 0)
+			{
+				text.append(text.length() == 0 ? "" : ", ").append(potion.getDisplayName()).append(' ')
+					.append(units.format(shortfall)).append(' ').append(units.getWord());
+			}
+		}
+		return text.toString();
+	}
+
 	/** Changes whenever the team section has to be redrawn. */
 	String teamSignature()
 	{
-		StringBuilder sb = new StringBuilder().append(inParty);
+		StringBuilder sb = new StringBuilder().append(inParty).append(units);
 		for (Member member : team)
 		{
 			sb.append('|').append(member.name).append(member.self).append(member.iron);
