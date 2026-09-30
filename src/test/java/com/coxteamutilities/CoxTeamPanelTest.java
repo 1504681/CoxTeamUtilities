@@ -10,7 +10,7 @@ import java.io.File;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
 import javax.swing.SwingUtilities;
@@ -45,6 +45,17 @@ public class CoxTeamPanelTest
 		}
 
 		@Override
+		public void setClaimDoses(Slot slot, int doses)
+		{
+		}
+
+		@Override
+		public boolean setSipRoom(Slot slot, CmRoom room, boolean sipThere)
+		{
+			return true;
+		}
+
+		@Override
 		public void resetDropCounts()
 		{
 		}
@@ -71,11 +82,11 @@ public class CoxTeamPanelTest
 		me.self = true;
 		me.status = new MemberStatus(EnumSet.copyOf(state.roles),
 			Arrays.asList("Standard spellbook (Muttadile Entangler)", "Nature runes (Muttadile Entangler)"),
-			new LinkedHashSet<>(), Supplies.of(new int[]{4, 12, 4, 4}));
+			new LinkedHashMap<>(), Supplies.of(new int[]{4, 12, 4, 4}));
 		PanelState.Member bob = new PanelState.Member();
 		bob.name = "Zezima the 2nd";
 		bob.status = new MemberStatus(EnumSet.of(Role.TIGHTROPE_VENATOR, Role.TIGHTROPE_TELEGRAB),
-			Collections.emptyList(), new LinkedHashSet<>(), Supplies.of(new int[]{8, 8, 8, 8}));
+			Collections.emptyList(), new LinkedHashMap<>(), Supplies.of(new int[]{8, 8, 8, 8}));
 		PanelState.Member quiet = new PanelState.Member();
 		quiet.name = "No Plugin";
 		state.team.addAll(Arrays.asList(me, bob, quiet));
@@ -105,19 +116,27 @@ public class CoxTeamPanelTest
 				{
 					PanelState.SlotView slot = new PanelState.SlotView();
 					slot.slot = new Slot(room, potion, i);
-					if (potion == Potion.OVERLOAD && i == 0)
+					if (potion == Potion.OVERLOAD && i == 0 && room == CmRoom.TEKTON)
 					{
-						slot.mine = true;
-						slot.owners.add("You");
+						// shared: you sip twice and drop it, they pick it up
+						slot.add("You", true, new Claim(slot.slot, 2, 1, Arrays.asList(CmRoom.TEKTON, CmRoom.ICE_DEMON)));
+						slot.add("Zezima the 2nd", false,
+							new Claim(slot.slot, 2, 2, Arrays.asList(CmRoom.VANGUARDS, CmRoom.VESPULA)));
+					}
+					else if (potion == Potion.OVERLOAD && i == 0)
+					{
+						slot.add("You", true, Claim.whole(slot.slot, 1));
 					}
 					else if (potion == Potion.OVERLOAD && i == 1)
 					{
-						slot.owners.add("Zezima the 2nd");
+						// half claimed, the rest is up for grabs
+						slot.add("Zezima the 2nd", false, new Claim(slot.slot, 2, 1, null));
 					}
 					else if (potion == Potion.XERICS_AID && i == 0)
 					{
-						slot.mine = true;
-						slot.owners.addAll(Arrays.asList("You", "Zezima the 2nd"));
+						// two people clicked at once
+						slot.add("You", true, Claim.whole(slot.slot, 1));
+						slot.add("Zezima the 2nd", false, Claim.whole(slot.slot, 1));
 					}
 					drop.slots.add(slot);
 				}

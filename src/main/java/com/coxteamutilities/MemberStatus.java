@@ -2,8 +2,10 @@ package com.coxteamutilities;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashSet;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /** What one party member last told us about themselves. */
@@ -16,10 +18,10 @@ public final class MemberStatus
 
 	private final Set<Role> roles;
 	private final List<String> missing;
-	private final Set<Slot> claims;
+	private final Map<Slot, Claim> claims;
 	private final Supplies carried;
 
-	public MemberStatus(Set<Role> roles, List<String> missing, Set<Slot> claims, Supplies carried)
+	public MemberStatus(Set<Role> roles, List<String> missing, Map<Slot, Claim> claims, Supplies carried)
 	{
 		this.roles = roles;
 		this.missing = missing;
@@ -40,15 +42,15 @@ public final class MemberStatus
 				}
 			}
 		}
-		Set<Slot> claims = new LinkedHashSet<>();
+		Map<Slot, Claim> claims = new LinkedHashMap<>();
 		if (message.getClaims() != null)
 		{
-			for (String key : message.getClaims())
+			for (String encoded : message.getClaims())
 			{
-				Slot slot = Slot.parse(key);
-				if (slot != null && claims.size() < MAX_CLAIMS)
+				Claim claim = Claim.parse(encoded);
+				if (claim != null && claims.size() < MAX_CLAIMS)
 				{
-					claims.add(slot);
+					claims.put(claim.getSlot(), claim);
 				}
 			}
 		}
@@ -65,9 +67,9 @@ public final class MemberStatus
 		return Collections.unmodifiableList(missing);
 	}
 
-	public Set<Slot> getClaims()
+	public Collection<Claim> getClaims()
 	{
-		return Collections.unmodifiableSet(claims);
+		return Collections.unmodifiableCollection(claims.values());
 	}
 
 	public Supplies getCarried()

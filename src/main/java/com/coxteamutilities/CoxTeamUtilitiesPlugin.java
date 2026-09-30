@@ -11,8 +11,6 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -125,7 +123,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	/** Guards everything below that the Swing, client and party threads share. */
 	private final Object lock = new Object();
 	private final Set<Role> roles = EnumSet.noneOf(Role.class);
-	private final Set<Slot> claims = new LinkedHashSet<>();
+	private final ClaimBook claims = new ClaimBook();
 	private final Map<Long, MemberStatus> members = new HashMap<>();
 	private Map<Role, List<String>> missing = new EnumMap<>(Role.class);
 	private Supplies inventory = Supplies.EMPTY;
@@ -542,9 +540,9 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		synchronized (lock)
 		{
 			List<String> claimed = new ArrayList<>();
-			for (Slot slot : claims)
+			for (Claim claim : claims.all())
 			{
-				claimed.add(slot.key());
+				claimed.add(claim.encode());
 			}
 			Supplies carried = privateStorage == null ? inventory : inventory.plus(privateStorage);
 			status = new CoxStatusMessage(Role.names(roles), describe(missing), claimed, carried.toArray());
@@ -707,12 +705,73 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	{
 		synchronized (lock)
 		{
-			if (!claims.remove(slot))
+			if (!claims.toggle(slot, available(slot), nextOrder(slot)))
 			{
-				claims.add(slot);
+				return;
 			}
 		}
 		refresh();
+	}
+
+	@Override
+	public void setClaimDoses(Slot slot, int doses)
+	{
+		synchronized (lock)
+		{
+			if (!claims.setDoses(slot, doses, available(slot), nextOrder(slot)))
+			{
+				return;
+			}
+		}
+		refresh();
+	}
+
+	@Override
+	public boolean setSipRoom(Slot slot, CmRoom room, boolean sipThere)
+	{
+		synchronized (lock)
+		{
+			if (!claims.setSipRoom(slot, room, sipThere, available(slot), nextOrder(slot)))
+			{
+				return false;
+			}
+		}
+		refresh();
+		return true;
+	}
+
+	/** Doses of the potion the rest of the party hasn't claimed. Call with the lock held. */
+	private int available(Slot slot)
+	{
+		int taken = 0;
+		for (MemberStatus status : members.values())
+		{
+			for (Claim claim : status.getClaims())
+			{
+				if (claim.getSlot().equals(slot))
+				{
+					taken += claim.getDoses();
+				}
+			}
+		}
+		return Math.max(0, Claim.MAX_DOSES - taken);
+	}
+
+	/** Behind everyone who already has a share. Call with the lock held. */
+	private int nextOrder(Slot slot)
+	{
+		int order = 0;
+		for (MemberStatus status : members.values())
+		{
+			for (Claim claim : status.getClaims())
+			{
+				if (claim.getSlot().equals(slot))
+				{
+					order = Math.max(order, claim.getOrder());
+				}
+			}
+		}
+		return order + 1;
 	}
 
 	private void planEdited()
@@ -729,19 +788,11 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			String.join(",", plan.encode()));
 	}
 
-	/** A claim on the third overload goes away when the room turns out to drop two. */
 	private void dropClaimsPastCount()
 	{
 		synchronized (lock)
 		{
-			for (Iterator<Slot> it = claims.iterator(); it.hasNext(); )
-			{
-				Slot slot = it.next();
-				if (slot.getIndex() >= plan.count(slot.getRoom(), slot.getPotion()))
-				{
-					it.remove();
-				}
-			}
+			claims.dropPast(plan);
 		}
 	}
 
@@ -801,19 +852,14 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			state.missing.putAll(missing);
 
 			MemberStatus mine = new MemberStatus(EnumSet.copyOf(state.roles), describe(missing),
-				new LinkedHashSet<>(claims), privateStorage == null ? inventory : inventory.plus(privateStorage));
+				claims.bySlot(), privateStorage == null ? inventory : inventory.plus(privateStorage));
 
-			int[] claimedDoses = new int[Potion.values().length];
-			for (Slot slot : claims)
-			{
-				claimedDoses[slot.getPotion().ordinal()] += Potion.DOSES_PER_POTION;
-			}
-			state.claimed = Supplies.of(claimedDoses);
+			state.claimed = claims.doses();
 
-			Map<Slot, List<String>> owners = new HashMap<>();
-			for (Slot slot : claims)
+			Map<Slot, PanelState.SlotView> shares = new HashMap<>();
+			for (Claim claim : claims.all())
 			{
-				owners.computeIfAbsent(slot, s -> new ArrayList<>()).add("You");
+				shares.computeIfAbsent(claim.getSlot(), s -> new PanelState.SlotView()).add("You", true, claim);
 			}
 			for (PartyMember member : partyMembers)
 			{
@@ -824,9 +870,10 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 				state.team.add(view);
 				if (!view.self && view.status != null)
 				{
-					for (Slot slot : view.status.getClaims())
+					for (Claim claim : view.status.getClaims())
 					{
-						owners.computeIfAbsent(slot, s -> new ArrayList<>()).add(view.name);
+						shares.computeIfAbsent(claim.getSlot(), s -> new PanelState.SlotView())
+							.add(view.name, false, claim);
 					}
 				}
 			}
@@ -848,10 +895,9 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 					drop.edited = plan.isEdited(room, potion);
 					for (int i = 0; i < count; i++)
 					{
-						PanelState.SlotView view = new PanelState.SlotView();
-						view.slot = new Slot(room, potion, i);
-						view.mine = claims.contains(view.slot);
-						view.owners.addAll(owners.getOrDefault(view.slot, Collections.emptyList()));
+						Slot slot = new Slot(room, potion, i);
+						PanelState.SlotView view = shares.getOrDefault(slot, new PanelState.SlotView());
+						view.slot = slot;
 						drop.slots.add(view);
 					}
 					drops.potions.add(drop);

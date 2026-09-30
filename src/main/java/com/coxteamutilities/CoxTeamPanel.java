@@ -16,7 +16,9 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import javax.swing.JCheckBox;
+import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JLabel;
+import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
@@ -38,7 +40,13 @@ class CoxTeamPanel extends PluginPanel
 
 		void setDropCount(CmRoom room, Potion potion, int count);
 
+		/** Claims what's left of the potion, or drops your claim if you have one. */
 		void toggleClaim(Slot slot);
+
+		void setClaimDoses(Slot slot, int doses);
+
+		/** @return false if there's no dose left for one more room */
+		boolean setSipRoom(Slot slot, CmRoom room, boolean sipThere);
 
 		void resetDropCounts();
 	}
@@ -55,6 +63,7 @@ class CoxTeamPanel extends PluginPanel
 	private static final Color MINE = new Color(40, 90, 50);
 	private static final Color TAKEN = new Color(70, 60, 40);
 	private static final Color CONFLICT = new Color(120, 70, 20);
+	private static final Color OPEN = new Color(40, 70, 100);
 
 	private static final int SLOTS_PER_ROW = 3;
 	private static final int MAX_NAME = 12;
@@ -483,6 +492,14 @@ class CoxTeamPanel extends PluginPanel
 				{
 					dropsBody.addRow(slotGrid(drop), 2);
 				}
+				for (int i = 0; i < drop.slots.size(); i++)
+				{
+					PanelState.SlotView slot = drop.slots.get(i);
+					if (slot.planned())
+					{
+						addPlan(slot, i + 1);
+					}
+				}
 			}
 		}
 	}
@@ -537,9 +554,9 @@ class CoxTeamPanel extends PluginPanel
 	{
 		JPanel grid = new JPanel(new GridLayout(0, SLOTS_PER_ROW, 2, 2));
 		grid.setOpaque(false);
-		for (PanelState.SlotView slot : drop.slots)
+		for (int i = 0; i < drop.slots.size(); i++)
 		{
-			grid.add(slotChip(slot));
+			grid.add(slotChip(drop.slots.get(i), i + 1));
 		}
 		// keep a short last row the same width as the others
 		for (int i = drop.slots.size(); i < SLOTS_PER_ROW; i++)
@@ -551,24 +568,124 @@ class CoxTeamPanel extends PluginPanel
 		return grid;
 	}
 
-	private JLabel slotChip(PanelState.SlotView slot)
+	/** Who holds the potion when, under the row of chips. */
+	private void addPlan(PanelState.SlotView slot, int number)
 	{
-		if (slot.owners.isEmpty())
+		List<String> lines = slot.planLines();
+		for (int i = 0; i < lines.size(); i++)
 		{
-			return chip("free", ColorScheme.DARK_GRAY_COLOR, "Click to claim", () -> actions.toggleClaim(slot.slot));
+			JLabel line = wrapped((i == 0 ? "#" + number + " " : "") + lines.get(i),
+				slot.overclaimed() ? WARN : slot.holders.get(i).self ? GOOD : Color.WHITE);
+			line.setBorder(new EmptyBorder(0, i == 0 ? 0 : 10, 0, 0));
+			dropsBody.addRow(line, i == 0 ? 3 : 0);
 		}
-		String names = String.join(", ", slot.owners);
-		if (slot.owners.size() > 1)
+	}
+
+	private JLabel slotChip(PanelState.SlotView slot, int number)
+	{
+		Runnable click = () -> actions.toggleClaim(slot.slot);
+		String menuHint = "Right click for doses and sip rooms.";
+		JLabel chip;
+		if (slot.holders.isEmpty())
 		{
-			return chip(shorten(names), CONFLICT, "Claimed twice: " + names
-				+ (slot.mine ? ". Click to drop your claim." : ""),
-				slot.mine ? () -> actions.toggleClaim(slot.slot) : null);
+			chip = chip("free", ColorScheme.DARK_GRAY_COLOR, "Click to claim all of it. " + menuHint, click);
 		}
-		if (slot.mine)
+		else
 		{
-			return chip(shorten(names), MINE, "Yours. Click to drop the claim.", () -> actions.toggleClaim(slot.slot));
+			List<String> names = new ArrayList<>();
+			for (PanelState.Holder holder : slot.holders)
+			{
+				names.add(holder.name);
+			}
+			String text = shorten((slot.planned() ? "#" + number + " " : "") + String.join("/", names));
+
+			List<String> plan = new ArrayList<>();
+			for (String line : slot.planLines())
+			{
+				plan.add(escape(line));
+			}
+			String hint;
+			Color color;
+			if (slot.overclaimed())
+			{
+				color = CONFLICT;
+				hint = "More than " + Claim.MAX_DOSES + " doses claimed.";
+			}
+			else if (slot.me() != null)
+			{
+				color = MINE;
+				hint = "Click to drop your claim.";
+			}
+			else if (slot.freeDoses() > 0)
+			{
+				color = OPEN;
+				hint = "Click to pick it up after them and take the " + slot.freeDoses() + " left.";
+			}
+			else
+			{
+				color = TAKEN;
+				hint = "All claimed.";
+			}
+			boolean clickable = slot.me() != null || slot.freeDoses() > 0;
+			chip = chip(text, color, "<html>" + String.join("<br>", plan) + "<br><br>" + hint
+				+ (clickable ? " " + menuHint : "") + "</html>", clickable ? click : null);
 		}
-		return chip(shorten(names), TAKEN, "Claimed by " + names, null);
+		chip.setComponentPopupMenu(claimMenu(slot));
+		return chip;
+	}
+
+	private JPopupMenu claimMenu(PanelState.SlotView slot)
+	{
+		JPopupMenu menu = new JPopupMenu();
+		PanelState.Holder me = slot.me();
+		int available = slot.availableToMe();
+		if (available == 0)
+		{
+			JMenuItem none = new JMenuItem("All " + Claim.MAX_DOSES + " doses are claimed");
+			none.setEnabled(false);
+			menu.add(none);
+			return menu;
+		}
+
+		for (int doses = 1; doses <= available; doses++)
+		{
+			int take = doses;
+			JCheckBoxMenuItem item = new JCheckBoxMenuItem("Take " + doses + (doses == 1 ? " dose" : " doses"),
+				me != null && me.claim.getDoses() == doses);
+			item.addActionListener(e -> actions.setClaimDoses(slot.slot, take));
+			menu.add(item);
+		}
+
+		JMenu sip = new JMenu("Sip at");
+		for (CmRoom room : CmRoom.values())
+		{
+			if (room.ordinal() < slot.slot.getRoom().ordinal())
+			{
+				continue;
+			}
+			JCheckBoxMenuItem item = new JCheckBoxMenuItem(room.getDisplayName(),
+				me != null && me.claim.getSipRooms().contains(room));
+			// several rooms in one go
+			item.putClientProperty("CheckBoxMenuItem.doNotCloseOnMouseClick", Boolean.TRUE);
+			item.addActionListener(e ->
+			{
+				if (!actions.setSipRoom(slot.slot, room, item.isSelected()))
+				{
+					item.setSelected(!item.isSelected());
+				}
+			});
+			sip.add(item);
+		}
+		menu.add(sip);
+
+		if (me != null)
+		{
+			menu.addSeparator();
+			JMenuItem drop = new JMenuItem("Drop my claim");
+			drop.addActionListener(e -> actions.toggleClaim(slot.slot));
+			menu.add(drop);
+		}
+		return menu;
 	}
 
 	private static String shorten(String name)

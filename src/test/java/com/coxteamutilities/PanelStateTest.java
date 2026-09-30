@@ -79,7 +79,7 @@ public class PanelStateTest
 		Arrays.fill(missing, String.join("", Collections.nCopies(500, "x")));
 		for (int i = 0; i < claims.length; i++)
 		{
-			claims[i] = "TEKTON:OVERLOAD:" + i;
+			claims[i] = "TEKTON:OVERLOAD:" + i + ":2:1:TEKTON+VASA";
 		}
 		MemberStatus status = MemberStatus.from(new CoxStatusMessage(
 			Arrays.asList("MUTTADILE_ZGS", "junk"), Arrays.asList(missing), Arrays.asList(claims), new int[]{8, 12}));
@@ -109,6 +109,21 @@ public class PanelStateTest
 		assertNotEquals(before.dropsSignature(), after.dropsSignature());
 	}
 
+	@Test
+	public void signaturesNoticeDosesAndRooms()
+	{
+		PanelState whole = dropsWithOwner("Bob");
+		PanelState half = dropsWithOwner(null);
+		PanelState.SlotView slot = half.drops.get(0).potions.get(0).slots.get(0);
+		slot.add("Bob", false, new Claim(slot.slot, 2, 1, null));
+		PanelState rooms = dropsWithOwner(null);
+		slot = rooms.drops.get(0).potions.get(0).slots.get(0);
+		slot.add("Bob", false, new Claim(slot.slot, 2, 1, Collections.singleton(CmRoom.VASA)));
+
+		assertNotEquals(whole.dropsSignature(), half.dropsSignature());
+		assertNotEquals(half.dropsSignature(), rooms.dropsSignature());
+	}
+
 	private static PanelState dropsWithOwner(String owner)
 	{
 		PanelState state = new PanelState();
@@ -121,7 +136,7 @@ public class PanelStateTest
 		slot.slot = new Slot(CmRoom.TEKTON, Potion.OVERLOAD, 0);
 		if (owner != null)
 		{
-			slot.owners.add(owner);
+			slot.add(owner, false, Claim.whole(slot.slot, 1));
 		}
 		drop.slots.add(slot);
 		room.potions.add(drop);
