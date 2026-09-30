@@ -1,59 +1,64 @@
-# RuneLite Plugin Template
+# CoX Team Utilities
 
-A ready-to-go template for building RuneLite plugins. Includes build config, dev launcher, test setup, and all the boilerplate.
+RuneLite plugin for Chambers of Xeric Challenge Mode teams. A sidebar panel where you pick your roles, see what potions you have and still need, and claim the potions each room is going to drop. With the Party plugin everyone in the party sees the same thing.
 
-## Quick Start
+## Roles
 
-1. Clone this repo
-2. Rename the package from `com.myplugin` to your plugin's package
-3. Update `MyPlugin.java`, `MyConfig.java`, `runelite_plugin.json`, `runelite-plugin.properties`, `settings.gradle`, and `build.gradle` with your plugin name
-4. Run `./gradlew run` to launch RuneLite with your plugin loaded
+Tick the roles you're doing. You can tick more than one.
 
-## Commands
+| Room | Role | Checked |
+|---|---|---|
+| Tightrope | Venator bow | charged Venator bow |
+| Tightrope | Chins | grey, red or black chinchompas |
+| Tightrope | Telegrab | standard spellbook, 1 law rune |
+| Muttadile | ZGS | Zamorak godsword |
+| Muttadile | Entangler | standard spellbook, 4 nature runes |
 
-| Command | Description |
-|---------|-------------|
-| `./gradlew run` | Launch RuneLite with plugin loaded (includes all your plugin hub plugins) |
-| `./gradlew build` | Compile and run tests |
-| `./gradlew clean build` | Full rebuild |
-| `./gradlew installPlugin` | Install JAR to `~/.runelite/externalPlugins` |
-| `./gradlew shadowJar` | Build fat JAR with all dependencies |
+Items count from your inventory, worn equipment, private storage and rune pouch. Only the law and nature runes are checked for the spells, not the elemental runes.
 
-## Project Structure
+If something is missing the role turns red in the sidebar, an overlay lists it at the raid lobby and inside the raid until it starts, and a chat message (only you see it) repeats it when you enter.
 
-```
-src/
-  main/
-    java/com/myplugin/
-      MyPlugin.java          -- Main plugin class
-      MyConfig.java          -- Config interface (shows in RuneLite settings)
-    resources/
-      runelite_plugin.json   -- Plugin metadata (excluded from main JAR, included in installPlugin)
-  test/
-    java/com/myplugin/
-      MyPluginLauncher.java  -- Dev launcher (runs RuneLite with plugin)
-      MyPluginTest.java      -- Unit tests with Guice/Mockito
-```
+## Supplies
 
-## Important Notes
+Overload, Xeric's aid, Revitalisation and Prayer enhance doses, split into inventory, private storage, shared storage and claimed drops. Set the doses you want by Olm with the number next to each potion and the row shows how many you're short.
 
-- **JDK 11 required** for running (JDK 21 can compile but crashes at runtime due to Guice ASM issues)
-- **gradle.properties** points to JDK 11 install path — update if yours is different
-- **@Provides for Config** is REQUIRED or Guice injection fails silently
-- **Don't use Lombok** in plugin classes — causes Guice ClassReader crashes
-- **runelite_plugin.json** must be excluded from main resources but included in installPlugin task
-- The dev launcher (`./gradlew run`) loads ALL your installed plugin hub plugins too
+The game only sends storage contents when you open the storage unit, so both storages show `?` until you've opened them in the current raid.
 
-## Adding Features
+## Drops
 
-### Overlay
-Create a class extending `Overlay` or `OverlayPanel`, inject it, register in `startUp()`.
+Every potion a room drops is a box you can click to claim. Counts start from the OSRS Wiki drop tables:
 
-### Sidebar Panel
-Create a class extending `PluginPanel`, create a `NavigationButton`, add via `clientToolbar.addNavigation()`.
+| Room | Overload | Xeric's aid | Revitalisation | Prayer enhance | Other |
+|---|---|---|---|---|---|
+| Tekton | 2 | | 1 | 1 | |
+| Vanguards | 1 to 3 | 4 | 2 | 1 | Elder 1, Twisted 1, Kodai 1 |
+| Vespula | 1 | 2 | 1 | 1 | |
+| Vasa | 1 | 2 | | | Twisted 2 |
+| Muttadile | 2 | 1 | 1 | 2 | |
 
-### Config Options
-Add `@ConfigItem` methods to your config interface. Supports boolean, int, String, Color, enums.
+The wiki has no numbers for larger teams, so use `-` and `+` to set what your team size gets. Edited counts are kept between raids. The Vanguards overload count is random, so it goes back to 1 after each raid. Right click a room name to add a potion the table doesn't list. Claims are cleared when you leave the raid.
 
-### Event Handling
-Add `@Subscribe` methods for events like `GameTick`, `ItemContainerChanged`, `MenuEntryAdded`, etc.
+## Party
+
+Join a party with the core Party plugin. Each member with this plugin shows up under Team with their roles, missing items and doses carried. Claims and drop count edits are shared.
+
+## Settings
+
+| Setting | Default |
+|---|---|
+| Doses needed: Overload / Xeric's aid / Revitalisation / Prayer enhance | 4 / 12 / 8 / 4 |
+| Count claimed drops towards what you need | on |
+| Count shared storage towards what you need | off |
+| Missing item overlay | on |
+| Keep overlay during the raid | off |
+| Include party members in reminders | on |
+| Chat message on entry | on |
+| Notify on entry | off |
+
+## Changelog
+
+1.0.0: first release.
+
+## License
+
+BSD 2-Clause, see LICENSE.

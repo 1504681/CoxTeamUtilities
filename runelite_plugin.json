@@ -1,0 +1,22 @@
+{
+  "plugins": [
+    "com.coxteamutilities.CoxTeamUtilitiesPlugin"
+  ],
+  "displayName": "CoX Team Utilities",
+  "author": "1504681",
+  "description": "Pick your Chambers of Xeric CM roles, get reminded of missing role items, track potions and claim drops with your party",
+  "tags": [
+    "cox",
+    "chambers",
+    "xeric",
+    "raids",
+    "cm",
+    "challenge mode",
+    "party",
+    "roles",
+    "storage",
+    "overload",
+    "team"
+  ],
+  "version": "1.0.0"
+}

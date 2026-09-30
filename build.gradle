@@ -18,7 +18,7 @@ repositories {
 }
 
 def runeLiteVersion = 'latest.release'
-def pluginMainClass = 'com.myplugin.MyPluginLauncher'
+def pluginMainClass = 'com.coxteamutilities.CoxTeamUtilitiesLauncher'
 
 dependencies {
 	compileOnly group: 'net.runelite', name:'client', version: runeLiteVersion
@@ -41,7 +41,7 @@ configurations.all {
 	}
 }
 
-group = 'com.myplugin'
+group = 'com.coxteamutilities'
 version = '1.0.0'
 
 tasks.withType(JavaCompile).configureEach {
@@ -51,10 +51,7 @@ tasks.withType(JavaCompile).configureEach {
 
 test {
 	jvmArgs '--add-opens=java.base/java.lang=ALL-UNNAMED'
-}
-
-sourceSets.main.resources {
-	exclude 'runelite_plugin.json'
+	systemProperty 'java.awt.headless', 'true'
 }
 
 tasks.register('run', JavaExec) {
@@ -67,7 +64,7 @@ tasks.register('run', JavaExec) {
 
 tasks.register('installPlugin', Jar) {
 	from sourceSets.main.output
-	from('src/main/resources') {
+	from('.') {
 		include 'runelite_plugin.json'
 	}
 
