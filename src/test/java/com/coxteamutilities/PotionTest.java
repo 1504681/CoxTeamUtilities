@@ -32,6 +32,8 @@ public class PotionTest
 		PanelState state = new PanelState();
 		assertFalse(state.applies(Potion.STAMINA));
 		state.solo = true;
+		assertFalse(state.applies(Potion.STAMINA));
+		state.trackStamina = true;
 		assertTrue(state.applies(Potion.STAMINA));
 		assertFalse(state.applies(Potion.SPLIT_OVERLOAD));
 	}
@@ -41,6 +43,7 @@ public class PotionTest
 	{
 		PanelState state = new PanelState();
 		state.solo = true;
+		state.trackStamina = true;
 		state.units = NeedUnits.POTIONS;
 		state.need.put(Potion.XERICS_AID, 24);
 		state.need.put(Potion.STAMINA, 4);

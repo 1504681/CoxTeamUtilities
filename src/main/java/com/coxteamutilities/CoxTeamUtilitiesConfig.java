@@ -55,6 +55,18 @@ public interface CoxTeamUtilitiesConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "trackStamina",
+		name = "Stamina in solo raids",
+		description = "Show a Stamina row and count it as short for Olm in solo raids",
+		section = needSection,
+		position = 2
+	)
+	default boolean trackStamina()
+	{
+		return false;
+	}
+
+	@ConfigItem(
 		keyName = "countShared",
 		name = "Count shared storage",
 		description = "Count what's in shared storage towards the doses you need",

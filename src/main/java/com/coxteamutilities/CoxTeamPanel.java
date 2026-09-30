@@ -581,7 +581,7 @@ class CoxTeamPanel extends PluginPanel
 		soloTab.setForeground(state.solo ? Color.WHITE : MUTED);
 		String same = state.separateSoloNeeds ? "" : "<br>Same numbers for both until 'Separate doses for solo raids' is on in the settings";
 		teamTab.setToolTipText("<html>What you need for Olm in a team raid" + same + "</html>");
-		soloTab.setToolTipText("<html>What you need for Olm in a solo raid, stamina included" + same + "</html>");
+		soloTab.setToolTipText("<html>What you need for Olm in a solo raid" + same + "</html>");
 	}
 
 	private void updateRoles(PanelState state)

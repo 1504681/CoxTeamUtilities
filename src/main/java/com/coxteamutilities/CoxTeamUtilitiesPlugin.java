@@ -1083,6 +1083,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		state.countSplit = config.countSplit();
 		state.units = config.needUnits();
 		state.separateSoloNeeds = config.separateSoloNeeds();
+		state.trackStamina = config.trackStamina();
 		state.solo = solo();
 		Needs needs = needsFor(state.solo);
 		for (Potion potion : Potion.values())

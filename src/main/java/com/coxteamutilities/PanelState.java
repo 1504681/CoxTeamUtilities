@@ -259,6 +259,7 @@ final class PanelState
 	/** Whether the numbers are for a solo raid: the raid's size while in one, the tab otherwise. */
 	boolean solo;
 	boolean separateSoloNeeds;
+	boolean trackStamina;
 	NeedUnits units = NeedUnits.DOSES;
 
 	final Set<Role> roles = EnumSet.noneOf(Role.class);
@@ -342,7 +343,7 @@ final class PanelState
 	/** Whether the supply row for this potion applies right now. */
 	boolean applies(Potion potion)
 	{
-		return potion.isSupply() && (solo || !potion.isSoloOnly());
+		return potion.isSupply() && (!potion.isSoloOnly() || (solo && trackStamina));
 	}
 
 	/** "Xeric's aid 8 doses, Stamina 1 potion" for everything short, empty when nothing is. */
