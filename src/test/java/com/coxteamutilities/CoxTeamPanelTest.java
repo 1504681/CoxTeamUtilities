@@ -1,6 +1,5 @@
 package com.coxteamutilities;
 
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.Dimension;
@@ -12,7 +11,6 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import javax.imageio.ImageIO;
-import javax.swing.ImageIcon;
 import javax.swing.SwingUtilities;
 import net.runelite.client.ui.PluginPanel;
 import static org.junit.Assert.assertEquals;
@@ -30,47 +28,7 @@ public class CoxTeamPanelTest
 		}
 
 		@Override
-		public void setNeed(Potion potion, int doses)
-		{
-		}
-
-		@Override
-		public void setNeedsTab(boolean solo)
-		{
-		}
-
-		@Override
 		public void finishRaid()
-		{
-		}
-
-		@Override
-		public void renameChest(String key, String name)
-		{
-		}
-
-		@Override
-		public void setChestOrdered(String key, boolean ordered)
-		{
-		}
-
-		@Override
-		public void setChestLines(String key, boolean deposit, String text)
-		{
-		}
-
-		@Override
-		public void setMarking(boolean on)
-		{
-		}
-
-		@Override
-		public void selectChest(String key)
-		{
-		}
-
-		@Override
-		public void deleteChest(String key)
 		{
 		}
 
@@ -105,25 +63,6 @@ public class CoxTeamPanelTest
 	{
 		PanelState state = new PanelState();
 		state.inParty = true;
-		state.inventory = Supplies.of(new int[]{4, 8, 4, 0});
-		state.privateStorage = Supplies.of(new int[]{0, 4, 0, 4});
-		state.claimed = Supplies.of(new int[]{4, 0, 0, 0});
-		state.solo = true;
-		state.units = NeedUnits.POTIONS;
-		Needs needs = Needs.soloDefaults();
-		for (Potion potion : Potion.values())
-		{
-			state.need.put(potion, state.applies(potion) ? needs.get(potion) : 0);
-		}
-		ChestPlan ice = state.chests.getOrCreate("RAIDS_ICE_DEMON#1", "Ice Demon");
-		ice.getDeposit().add("Elder maul");
-		ChestPlan farm = state.chests.getOrCreate("RAIDS_FARMING#1", "Farming 1");
-		farm.getDeposit().add("everything");
-		farm.getWithdraw().addAll(Arrays.asList("Xeric's aid, 2", "Stinkhorn mushroom, 3", "Noxifer"));
-		farm.setOrdered(true);
-		state.currentChest = "RAIDS_FARMING#1";
-		state.marking = true;
-		state.carriedItems = ChestProgress.tally(Arrays.asList("Xeric's aid(4)", "Xeric's aid(3)", "Stinkhorn mushroom"));
 		state.roles.addAll(EnumSet.of(Role.MUTTADILE_ZGS, Role.MUTTADILE_ENTANGLE, Role.TIGHTROPE_LURER));
 		state.missing.put(Role.MUTTADILE_ENTANGLE, Arrays.asList("Standard spellbook", "Nature runes"));
 
@@ -132,12 +71,11 @@ public class CoxTeamPanelTest
 		me.self = true;
 		me.status = new MemberStatus(EnumSet.copyOf(state.roles),
 			Arrays.asList("Standard spellbook (Muttadile Entangler)", "Nature runes (Muttadile Entangler)"),
-			new LinkedHashMap<>(), Supplies.of(new int[]{4, 12, 4, 4}), null, null, false);
+			new LinkedHashMap<>(), false);
 		PanelState.Member bob = new PanelState.Member();
 		bob.name = "Zezima the 2nd";
 		bob.status = new MemberStatus(EnumSet.of(Role.TIGHTROPE_LURER, Role.TIGHTROPE_TELEGRAB),
-			Collections.emptyList(), new LinkedHashMap<>(), Supplies.of(new int[]{4, 8, 4, 4}),
-			Supplies.of(new int[]{4, 0, 4, 4}), Supplies.of(new int[]{4, 16, 0, 0}), true);
+			Collections.emptyList(), new LinkedHashMap<>(), true);
 		bob.iron = true;
 		PanelState.Member quiet = new PanelState.Member();
 		quiet.name = "No Plugin";
@@ -242,15 +180,7 @@ public class CoxTeamPanelTest
 		int[] rightEdge = new int[1];
 		SwingUtilities.invokeAndWait(() ->
 		{
-			CoxTeamPanel panel = new CoxTeamPanel(NO_ACTIONS, (label, itemId) ->
-			{
-				BufferedImage square = new BufferedImage(36, 32, BufferedImage.TYPE_INT_ARGB);
-				Graphics2D g = square.createGraphics();
-				g.setColor(new Color(itemId * 9973 % 0xffffff));
-				g.fillRoundRect(10, 4, 16, 24, 6, 6);
-				g.dispose();
-				label.setIcon(new ImageIcon(square));
-			});
+			CoxTeamPanel panel = new CoxTeamPanel(NO_ACTIONS);
 			panel.update(busyRaid());
 			panel.showClaims(claimsOpen);
 

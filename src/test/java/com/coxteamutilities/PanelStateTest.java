@@ -4,67 +4,11 @@ import java.util.Arrays;
 import java.util.Collections;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 public class PanelStateTest
 {
-	private static Supplies overloads(int doses)
-	{
-		return Supplies.of(new int[]{doses});
-	}
-
-	@Test
-	public void shortfallCountsInventoryAndPrivateStorage()
-	{
-		PanelState state = new PanelState();
-		state.need.put(Potion.OVERLOAD, 12);
-		state.inventory = overloads(4);
-		assertEquals(8, state.shortfall(Potion.OVERLOAD));
-		state.privateStorage = overloads(4);
-		assertEquals(4, state.shortfall(Potion.OVERLOAD));
-	}
-
-	@Test
-	public void sharedOnlyCountsWhenAskedAndClaimsNever()
-	{
-		PanelState state = new PanelState();
-		state.need.put(Potion.OVERLOAD, 12);
-		state.sharedStorage = overloads(8);
-		state.claimed = overloads(4);
-		assertEquals(12, state.shortfall(Potion.OVERLOAD));
-		state.countShared = true;
-		assertEquals(4, state.shortfall(Potion.OVERLOAD));
-	}
-
-	@Test
-	public void splitOverloadsCountAsOverload()
-	{
-		PanelState state = new PanelState();
-		state.need.put(Potion.OVERLOAD, 12);
-		state.countSplit = true;
-		state.inventory = overloads(4);
-		// elder in the inventory, twisted and kodai in private storage
-		state.inventory = state.inventory.plus(Supplies.count(new int[]{20924}, new int[]{1}));
-		state.privateStorage = Supplies.count(new int[]{20936, 20948}, new int[]{1, 1});
-		assertEquals(8, state.have(Potion.OVERLOAD));
-		assertEquals(4, state.shortfall(Potion.OVERLOAD));
-
-		state.countSplit = false;
-		assertEquals(4, state.have(Potion.OVERLOAD));
-	}
-
-	@Test
-	public void neverNegative()
-	{
-		PanelState state = new PanelState();
-		state.need.put(Potion.OVERLOAD, 4);
-		state.inventory = overloads(40);
-		assertEquals(0, state.shortfall(Potion.OVERLOAD));
-		assertEquals(0, state.shortfall(Potion.KODAI));
-	}
-
 	@Test
 	public void partyMessagesAreCapped()
 	{
@@ -76,16 +20,12 @@ public class PanelStateTest
 			claims[i] = "TEKTON:OVERLOAD:" + i + ":2:1:TEKTON+VASA";
 		}
 		MemberStatus status = MemberStatus.from(new CoxStatusMessage(
-			Arrays.asList("MUTTADILE_ZGS", "junk"), Arrays.asList(missing), Arrays.asList(claims), new int[]{8, 12}, null, null, true));
+			Arrays.asList("MUTTADILE_ZGS", "junk"), Arrays.asList(missing), Arrays.asList(claims), true));
 		assertTrue(status.isIron());
 		assertEquals(Collections.singleton(Role.MUTTADILE_ZGS), status.getRoles());
 		assertEquals(MemberStatus.MAX_MISSING, status.getMissing().size());
 		assertEquals(MemberStatus.MAX_TEXT, status.getMissing().get(0).length());
 		assertEquals(DropPlan.MAX_COUNT, status.getClaims().size());
-		assertEquals(12, status.getCarried().doses(Potion.XERICS_AID));
-		assertEquals(12, status.getHeld().doses(Potion.XERICS_AID));
-		assertNull(status.getStored());
-		assertNull(status.getShared());
 	}
 
 	@Test
@@ -95,7 +35,6 @@ public class PanelStateTest
 		assertTrue(status.getRoles().isEmpty());
 		assertTrue(status.getMissing().isEmpty());
 		assertTrue(status.getClaims().isEmpty());
-		assertEquals(Supplies.EMPTY, status.getCarried());
 	}
 
 	@Test

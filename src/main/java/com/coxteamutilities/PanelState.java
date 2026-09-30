@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.EnumSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -248,86 +247,12 @@ final class PanelState
 	boolean inParty;
 	/** Whether you are an ironman. */
 	boolean iron;
-	boolean countShared;
-	boolean countSplit;
-
-	Supplies inventory = Supplies.EMPTY;
-	/** null until the storage has been opened this raid */
-	Supplies privateStorage;
-	Supplies sharedStorage;
-	Supplies claimed = Supplies.EMPTY;
-	final Map<Potion, Integer> need = new EnumMap<>(Potion.class);
-	/** Whether the numbers are for a solo raid: the raid's size while in one, the tab otherwise. */
-	boolean solo;
-	boolean separateSoloNeeds;
-	boolean trackStamina;
-	NeedUnits units = NeedUnits.DOSES;
-	ChestBook chests = new ChestBook();
-	/** Chest of the room the player is in, null outside one. */
-	String currentChest;
-	/** Item name to quantity in the inventory, for the steps of a chest that isn't open. */
-	Map<String, Integer> carriedItems = new LinkedHashMap<>();
-	/** Progress at the storage that's open right now, null when none is. */
-	ChestProgress openChest;
-	/** What happened at each chest the last time its storage was open, this session. */
-	/** Whether clicking items in a storage or the inventory adds them to the chest's lists. */
-	boolean marking;
 
 	final Set<Role> roles = EnumSet.noneOf(Role.class);
 	final Map<Role, List<String>> missing = new EnumMap<>(Role.class);
 
 	final List<Member> team = new ArrayList<>();
 	final List<RoomDrops> drops = new ArrayList<>();
-
-	/** Everything within reach: inventory, private storage, and shared storage if that counts. */
-	private Supplies held()
-	{
-		Supplies held = inventory;
-		if (privateStorage != null)
-		{
-			held = held.plus(privateStorage);
-		}
-		Supplies shared = shared();
-		if (countShared && shared != null)
-		{
-			held = held.plus(shared);
-		}
-		return held;
-	}
-
-	/** The shared storage as you saw it, or as a party member did if you haven't opened it. */
-	Supplies shared()
-	{
-		if (sharedStorage != null)
-		{
-			return sharedStorage;
-		}
-		for (Member member : team)
-		{
-			if (member.status != null && member.status.getShared() != null)
-			{
-				return member.status.getShared();
-			}
-		}
-		return null;
-	}
-
-	/** Overload doses you hold as sets of elder, twisted and kodai. */
-	int splitHeld()
-	{
-		return held().splitOverloadDoses();
-	}
-
-	/** Doses that count towards what you need. */
-	int have(Potion potion)
-	{
-		int have = held().doses(potion);
-		if (potion == Potion.OVERLOAD && countSplit)
-		{
-			have += splitHeld();
-		}
-		return have;
-	}
 
 	/** Claims anyone in the party has made. */
 	int claimCount()
@@ -346,44 +271,16 @@ final class PanelState
 		return count;
 	}
 
-	int shortfall(Potion potion)
-	{
-		return Math.max(0, need.getOrDefault(potion, 0) - have(potion));
-	}
-
-	/** Whether the supply row for this potion applies right now. */
-	boolean applies(Potion potion)
-	{
-		return potion.isSupply() && (!potion.isSoloOnly() || (solo && trackStamina));
-	}
-
-	/** "Xeric's aid 8 doses, Stamina 1 potion" for everything short, empty when nothing is. */
-	String shortfalls()
-	{
-		StringBuilder text = new StringBuilder();
-		for (Potion potion : Potion.values())
-		{
-			int shortfall = applies(potion) ? shortfall(potion) : 0;
-			if (shortfall > 0)
-			{
-				text.append(text.length() == 0 ? "" : ", ").append(potion.getDisplayName()).append(' ')
-					.append(units.format(shortfall)).append(' ').append(units.getWord());
-			}
-		}
-		return text.toString();
-	}
-
 	/** Changes whenever the team section has to be redrawn. */
 	String teamSignature()
 	{
-		StringBuilder sb = new StringBuilder().append(inParty).append(units);
+		StringBuilder sb = new StringBuilder().append(inParty);
 		for (Member member : team)
 		{
 			sb.append('|').append(member.name).append(member.self).append(member.iron);
 			if (member.status != null)
 			{
-				sb.append(member.status.getRoles()).append(member.status.getMissing())
-					.append(member.status.getHeld());
+				sb.append(member.status.getRoles()).append(member.status.getMissing());
 			}
 		}
 		return sb.toString();

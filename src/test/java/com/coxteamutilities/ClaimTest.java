@@ -130,7 +130,7 @@ public class ClaimTest
 		// someone sips twice and drops it, you take the rest and stand behind them
 		assertTrue(book.toggle(TEKTON_OVERLOAD, 2, 2));
 		assertEquals("TEKTON:OVERLOAD:0:2:2", book.all().get(0).encode());
-		assertEquals(2, book.doses().doses(Potion.OVERLOAD));
+		assertEquals(2, book.all().get(0).getDoses());
 
 		assertFalse(new ClaimBook().toggle(TEKTON_OVERLOAD, 0, 2));
 	}

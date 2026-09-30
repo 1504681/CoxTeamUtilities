@@ -1,6 +1,5 @@
 package com.coxteamutilities;
 
-import com.google.gson.Gson;
 import com.google.inject.Provides;
 import java.awt.Color;
 import java.awt.Graphics2D;
@@ -12,10 +11,7 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import javax.inject.Inject;
@@ -25,18 +21,12 @@ import net.runelite.api.Client;
 import net.runelite.api.EnumComposition;
 import net.runelite.api.EnumID;
 import net.runelite.api.GameState;
-import net.runelite.api.InstanceTemplates;
 import net.runelite.api.Item;
-import net.runelite.api.MenuAction;
-import net.runelite.api.MenuEntry;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.Player;
-import net.runelite.api.WorldView;
-import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
-import net.runelite.api.events.PostMenuSort;
 import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.events.WidgetClosed;
 import net.runelite.api.events.WidgetLoaded;
@@ -66,8 +56,8 @@ import net.runelite.client.ui.overlay.OverlayManager;
 
 @PluginDescriptor(
 	name = "CoX Team Utilities",
-	description = "Pick your Chambers of Xeric CM roles, get reminded of missing role items, track potions and claim drops with your party",
-	tags = {"cox", "chambers", "xeric", "raids", "cm", "challenge mode", "party", "roles", "storage", "overload", "team"}
+	description = "Pick your Chambers of Xeric CM roles, get reminded of missing role items and claim drops with your party",
+	tags = {"cox", "chambers", "xeric", "raids", "cm", "challenge mode", "party", "roles", "claims", "team"}
 )
 public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actions
 {
@@ -76,8 +66,6 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 
 	/** The raid lobby on Mount Quidamortem. */
 	private static final int LOBBY_REGION = 4919;
-	/** The Great Olm's chamber. */
-	private static final int OLM_REGION = 12889;
 	/** Ticks outside before a raid counts as left, so a relog or a reload doesn't wipe the raid's state. */
 	private static final int LEAVE_TICKS = 5;
 	/** Least ticks between two status messages to the party. */
@@ -120,15 +108,6 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	private MissingItemsOverlay overlay;
 
 	@Inject
-	private ChestOverlay chestOverlay;
-
-	@Inject
-	private ChestItemOverlay chestItemOverlay;
-
-	@Inject
-	private Gson gson;
-
-	@Inject
 	private PartyService party;
 
 	@Inject
@@ -144,28 +123,6 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	private NavigationButton navigationButton;
 
 	private final DropPlan plan = new DropPlan();
-	private volatile ChestBook chests = new ChestBook();
-	/** Names of the item in each inventory slot, null for empty, for the chest plans. */
-	/** Item name to quantity in the inventory. */
-	private Map<String, Integer> inventoryItems = Collections.emptyMap();
-	/** The inventory when the storage was opened, so a "put in, N" line knows how many went in. */
-	private Map<String, Integer> openedWith = Collections.emptyMap();
-	/** Key of the chest for the room the player is in, null outside a room with one. */
-	private volatile String currentChest;
-	/** Progress at the chest whose storage is open, for the overlays. */
-	private volatile ChestProgress openChest;
-	/** Rooms seen this raid: room slot to chest key, to tell the two farming rooms apart. */
-	private final Map<String, String> roomKeys = new LinkedHashMap<>();
-	private String lastRoomSlot;
-	private final Map<Integer, String> itemNames = new HashMap<>();
-	/** While on, left-clicking an item in a storage or the inventory adds it to the chest's lists. */
-	private volatile boolean marking;
-	/** The chest picked in the sidebar, marked from the inventory when no storage is open. */
-	private volatile String selectedChest;
-	private volatile Needs needs = Needs.defaults();
-	private volatile Needs needsSolo = Needs.soloDefaults();
-	/** Whether the sidebar shows and edits the solo doses outside a raid. */
-	private volatile boolean needsTabSolo;
 
 	/** Guards everything below that the Swing, client and party threads share. */
 	private final Object lock = new Object();
@@ -173,23 +130,17 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	private final ClaimBook claims = new ClaimBook();
 	private final Map<Long, MemberStatus> members = new HashMap<>();
 	private Map<Role, List<String>> missing = new EnumMap<>(Role.class);
-	private Supplies inventory = Supplies.EMPTY;
-	private Supplies privateStorage;
-	private Supplies sharedStorage;
 
 	// client thread only
-	/** What's in the private storage, by item id, as last seen or worked out from deposits. */
+	/** What's in the private storage, by item id, as last seen or worked out from deposits. Role items count from there too. */
 	private final Map<Integer, Integer> privateItems = new HashMap<>();
 	/** Item counts in the inventory at the last inventory change, to see what a deposit moved. */
 	private final Map<Integer, Integer> lastInventory = new HashMap<>();
-	/** The storage interface that is open (its group id), 0 for none. */
-	private int openStorage;
-	/** The storage interface that just closed, and the last tick a deposit still counts for it. */
-	private int closedStorage;
+	/** Whether the private storage interface is open. */
+	private boolean storageOpen;
+	/** The last tick a deposit still counts for a storage that just closed. */
 	private int closedStorageUntil;
 	private boolean inRaid;
-	private boolean soloRaid;
-	private boolean atOlm;
 	private int ticksOutside;
 	private int ticksSinceSend = SEND_INTERVAL;
 	private CoxStatusMessage lastSent;
@@ -214,22 +165,15 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			roles.addAll(Role.parse(split(config.roles())));
 		}
 		plan.merge(split(config.plan()));
-		needs = Needs.parse(config.needs(), Needs.defaults());
-		needsSolo = Needs.parse(config.needsSolo(), Needs.soloDefaults());
-		needsTabSolo = config.needsTabSolo();
 
-		panel = new CoxTeamPanel(this, (label, itemId) -> itemManager.getImage(itemId).addTo(label));
+		panel = new CoxTeamPanel(this);
 		navigationButton = NavigationButton.builder()
 			.tooltip("CoX Team Utilities")
 			.icon(icon())
-			.priority(7)
 			.panel(panel)
 			.build();
 		clientToolbar.addNavigation(navigationButton);
 		overlayManager.add(overlay);
-		overlayManager.add(chestOverlay);
-		overlayManager.add(chestItemOverlay);
-		chests = ChestBook.parse(config.chests(), gson);
 
 		wsClient.registerMessage(CoxStatusMessage.class);
 		wsClient.registerMessage(CoxPlanMessage.class);
@@ -246,14 +190,6 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		wsClient.unregisterMessage(CoxStatusMessage.class);
 		wsClient.unregisterMessage(CoxPlanMessage.class);
 		overlayManager.remove(overlay);
-		overlayManager.remove(chestOverlay);
-		overlayManager.remove(chestItemOverlay);
-		roomKeys.clear();
-		lastRoomSlot = null;
-		currentChest = null;
-		openChest = null;
-		itemNames.clear();
-		marking = false;
 		clientToolbar.removeNavigation(navigationButton);
 		overlay.setLines(Collections.emptyList());
 		panel = null;
@@ -265,14 +201,11 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			claims.clear();
 			members.clear();
 			missing = new EnumMap<>(Role.class);
-			inventory = Supplies.EMPTY;
-			privateStorage = null;
-			sharedStorage = null;
 		}
 		plan.clear();
 		privateItems.clear();
 		lastInventory.clear();
-		openStorage = 0;
+		storageOpen = false;
 		inRaid = false;
 		lastSent = null;
 	}
@@ -330,20 +263,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 							privateItems.merge(item.getId(), item.getQuantity(), Integer::sum);
 						}
 					}
-					publishPrivateStorage();
-					updateOpenChest();
-				}
-				break;
-			case InventoryID.RAIDS_SHAREDSTORAGE:
-				if (inRaid)
-				{
-					Supplies stored = count(event.getItemContainer().getItems());
-					synchronized (lock)
-					{
-						sharedStorage = stored;
-					}
 					loadoutDirty = true;
-					updateOpenChest();
 				}
 				break;
 		}
@@ -352,108 +272,26 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	@Subscribe
 	public void onWidgetLoaded(WidgetLoaded event)
 	{
-		if (event.getGroupId() == InterfaceID.RAIDS_STORAGE_PRIVATE || event.getGroupId() == InterfaceID.RAIDS_STORAGE_SHARED)
+		if (event.getGroupId() == InterfaceID.RAIDS_STORAGE_PRIVATE)
 		{
-			openStorage = event.getGroupId();
-			synchronized (lock)
-			{
-				openedWith = inventoryItems;
-			}
-			String key = currentChest;
-			if (key != null && chests.get(key) == null && chests.getOrCreate(key, chestName(key)) != null)
-			{
-				saveChests();
-			}
-			updateOpenChest();
-			refresh();
+			storageOpen = true;
 		}
 	}
 
 	@Subscribe
 	public void onWidgetClosed(WidgetClosed event)
 	{
-		if (event.getGroupId() == openStorage)
+		if (event.getGroupId() == InterfaceID.RAIDS_STORAGE_PRIVATE && storageOpen)
 		{
 			// a deposit made as the interface closes still shows up in the inventory this tick or the next
-			closedStorage = openStorage;
+			storageOpen = false;
 			closedStorageUntil = client.getTickCount() + 1;
-			openStorage = 0;
-			openChest = null;
-		}
-	}
-
-	/** Puts "Mark" on top of an item's menu while marking, so a left click adds it to the chest's list. */
-	@Subscribe
-	public void onPostMenuSort(PostMenuSort event)
-	{
-		if (!marking)
-		{
-			return;
-		}
-		MenuEntry[] entries = client.getMenu().getMenuEntries();
-		for (MenuEntry entry : entries)
-		{
-			int itemId = entry.getItemId();
-			if (itemId <= 0 || entry.getType() == MenuAction.RUNELITE)
-			{
-				continue;
-			}
-			int group = entry.getParam1() >> 16;
-			boolean deposit;
-			String key;
-			if (group == InterfaceID.RAIDS_STORAGE_PRIVATE || group == InterfaceID.RAIDS_STORAGE_SHARED)
-			{
-				deposit = false;
-				key = currentChest;
-			}
-			else if (group == InterfaceID.RAIDS_STORAGE_SIDE)
-			{
-				deposit = true;
-				key = currentChest;
-			}
-			else if (group == InterfaceID.INVENTORY && openStorage == 0)
-			{
-				deposit = true;
-				key = selectedChest;
-			}
-			else
-			{
-				continue;
-			}
-			if (key == null)
-			{
-				return;
-			}
-			String target = entry.getTarget();
-			String list = deposit ? "put in" : "take out";
-			client.getMenu().createMenuEntry(-1)
-				.setOption("Unmark " + list)
-				.setTarget(target)
-				.setType(MenuAction.RUNELITE)
-				.onClick(e -> markItem(key, deposit, itemId, -1));
-			client.getMenu().createMenuEntry(-1)
-				.setOption("Mark " + list)
-				.setTarget(target)
-				.setType(MenuAction.RUNELITE)
-				.onClick(e -> markItem(key, deposit, itemId, 1));
-			return;
-		}
-	}
-
-	private void markItem(String key, boolean deposit, int itemId, int delta)
-	{
-		ChestPlan plan = chests.getOrCreate(key, chestName(key));
-		if (plan != null && ChestPlan.mark(deposit ? plan.getDeposit() : plan.getWithdraw(), itemName(itemId), delta))
-		{
-			saveChests();
-			updateOpenChest();
-			refresh();
 		}
 	}
 
 	/**
-	 * The game only sends a storage's contents while its interface is open, so a deposit made as it
-	 * closes never arrives. What left the inventory went into the storage, so it's added here.
+	 * The game only sends the private storage's contents while its interface is open, so a deposit
+	 * made as it closes never arrives. What left the inventory went into the storage, so it's added here.
 	 */
 	private void inventoryChanged(Item[] items)
 	{
@@ -465,88 +303,40 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 				now.merge(item.getId(), item.getQuantity(), Integer::sum);
 			}
 		}
-		int storage = openStorage != 0 ? openStorage : client.getTickCount() <= closedStorageUntil ? closedStorage : 0;
-		if (storage != 0 && inRaid && !lastInventory.isEmpty())
+		boolean toStorage = storageOpen || client.getTickCount() <= closedStorageUntil;
+		if (toStorage && inRaid && !lastInventory.isEmpty())
 		{
-			Map<Integer, Integer> moved = new HashMap<>();
 			for (Map.Entry<Integer, Integer> e : lastInventory.entrySet())
 			{
-				int delta = e.getValue() - now.getOrDefault(e.getKey(), 0);
-				if (delta != 0)
-				{
-					moved.put(e.getKey(), delta);
-				}
+				moveToStorage(e.getKey(), e.getValue() - now.getOrDefault(e.getKey(), 0));
 			}
 			for (Map.Entry<Integer, Integer> e : now.entrySet())
 			{
 				if (!lastInventory.containsKey(e.getKey()))
 				{
-					moved.put(e.getKey(), -e.getValue());
+					moveToStorage(e.getKey(), -e.getValue());
 				}
-			}
-			if (!moved.isEmpty())
-			{
-				storageChanged(storage, moved);
 			}
 		}
 		lastInventory.clear();
 		lastInventory.putAll(now);
 	}
 
-	/** @param moved item id to the count that went into the storage, negative for what came out */
-	private void storageChanged(int storage, Map<Integer, Integer> moved)
+	/** @param delta count that went into the private storage, negative for what came out */
+	private void moveToStorage(int itemId, int delta)
 	{
-		if (storage == InterfaceID.RAIDS_STORAGE_PRIVATE)
+		if (delta == 0)
 		{
-			for (Map.Entry<Integer, Integer> e : moved.entrySet())
-			{
-				int quantity = privateItems.getOrDefault(e.getKey(), 0) + e.getValue();
-				if (quantity > 0)
-				{
-					privateItems.put(e.getKey(), quantity);
-				}
-				else
-				{
-					privateItems.remove(e.getKey());
-				}
-			}
-			publishPrivateStorage();
+			return;
+		}
+		int quantity = privateItems.getOrDefault(itemId, 0) + delta;
+		if (quantity > 0)
+		{
+			privateItems.put(itemId, quantity);
 		}
 		else
 		{
-			Supplies shared;
-			synchronized (lock)
-			{
-				shared = sharedStorage;
-			}
-			if (shared == null)
-			{
-				return;
-			}
-			int[] doses = shared.toArray();
-			for (Map.Entry<Integer, Integer> e : moved.entrySet())
-			{
-				Potion potion = Potion.of(e.getKey());
-				if (potion != null)
-				{
-					doses[potion.ordinal()] += potion.doses(e.getKey()) * e.getValue();
-				}
-			}
-			Supplies changed = Supplies.of(doses);
-			synchronized (lock)
-			{
-				sharedStorage = changed;
-			}
-			loadoutDirty = true;
-		}
-	}
-
-	private void publishPrivateStorage()
-	{
-		Supplies stored = count(privateItems);
-		synchronized (lock)
-		{
-			privateStorage = stored;
+			privateItems.remove(itemId);
 		}
 		loadoutDirty = true;
 	}
@@ -586,19 +376,6 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 				// what the client still holds is from an earlier raid until the storage is opened
 				loadoutDirty = true;
 			}
-			boolean soloNow = client.getVarbitValue(VarbitID.RAIDS_CLIENT_PARTYSIZE) <= 1;
-			if (soloNow != soloRaid)
-			{
-				soloRaid = soloNow;
-				changed = true;
-			}
-			trackRoom();
-			boolean olmNow = region() == OLM_REGION;
-			if (olmNow && !atOlm && config.olmReminder())
-			{
-				remindAtOlm();
-			}
-			atOlm = olmNow;
 		}
 		else if (inRaid && ++ticksOutside >= LEAVE_TICKS)
 		{
@@ -657,154 +434,6 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		return config.remindSolo() || client.getVarbitValue(VarbitID.RAIDS_CLIENT_PARTYSIZE) > 1;
 	}
 
-	/**
-	 * Works out which chest the player is at. A room is its template (RAIDS_FARMING, RAIDS_ICE_DEMON...)
-	 * and the two rooms of the same template are told apart by which came first this raid, which
-	 * is fixed in Challenge Mode. Room slots are 32x32 tile squares of the instance; walking within
-	 * a room that straddles two squares keeps the same key.
-	 */
-	private void trackRoom()
-	{
-		Player player = client.getLocalPlayer();
-		WorldView view = client.getTopLevelWorldView();
-		if (player == null || view == null || !view.isInstance())
-		{
-			currentChest = null;
-			return;
-		}
-		LocalPoint local = player.getLocalLocation();
-		int[][][] chunks = view.getInstanceTemplateChunks();
-		int plane = view.getPlane();
-		int chunkX = local.getSceneX() / 8;
-		int chunkY = local.getSceneY() / 8;
-		if (chunks == null || plane >= chunks.length || chunkX < 0 || chunkX >= chunks[plane].length
-			|| chunkY < 0 || chunkY >= chunks[plane][chunkX].length)
-		{
-			currentChest = null;
-			return;
-		}
-		InstanceTemplates template = InstanceTemplates.findMatch(chunks[plane][chunkX][chunkY]);
-		if (template == null || !template.name().startsWith("RAIDS_") || template == InstanceTemplates.RAIDS_LOBBY)
-		{
-			currentChest = null;
-			return;
-		}
-		WorldPoint world = player.getWorldLocation();
-		int slotX = Math.floorDiv(world.getX(), 32);
-		int slotY = Math.floorDiv(world.getY(), 32);
-		String slot = template.name() + ":" + slotX + ":" + slotY + ":" + world.getPlane();
-		String key = roomKeys.get(slot);
-		if (key == null)
-		{
-			// the same room type next door is the same room across a square's edge
-			if (lastRoomSlot != null && lastRoomSlot.startsWith(template.name() + ":"))
-			{
-				String[] parts = lastRoomSlot.split(":");
-				if (Math.abs(Integer.parseInt(parts[1]) - slotX) <= 1 && Math.abs(Integer.parseInt(parts[2]) - slotY) <= 1)
-				{
-					key = roomKeys.get(lastRoomSlot);
-				}
-			}
-			if (key == null)
-			{
-				int n = 1;
-				for (String seen : new HashSet<>(roomKeys.values()))
-				{
-					if (seen.startsWith(template.name() + "#"))
-					{
-						n++;
-					}
-				}
-				key = template.name() + "#" + n;
-			}
-			roomKeys.put(slot, key);
-		}
-		lastRoomSlot = slot;
-		if (!key.equals(currentChest))
-		{
-			currentChest = key;
-			refresh();
-		}
-	}
-
-	/** "Farming 2", "Ice Demon" from a key like RAIDS_FARMING#2. */
-	static String chestName(String key)
-	{
-		String[] parts = key.substring("RAIDS_".length()).split("#");
-		String[] words = parts[0].toLowerCase(Locale.ROOT).split("_");
-		StringBuilder name = new StringBuilder();
-		for (String word : words)
-		{
-			name.append(name.length() == 0 ? "" : " ").append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
-		}
-		if (name.toString().endsWith("2"))
-		{
-			name.setLength(name.length() - 1);
-		}
-		String number = parts.length > 1 ? parts[1] : "1";
-		boolean several = key.startsWith("RAIDS_FARMING") || key.startsWith("RAIDS_SCAVENGERS") || !number.equals("1");
-		return several ? name + " " + number : name.toString();
-	}
-
-	private void saveChests()
-	{
-		configManager.setConfiguration(CoxTeamUtilitiesConfig.GROUP, CoxTeamUtilitiesConfig.KEY_CHESTS, chests.encode(gson));
-	}
-
-	/** Recomputes the progress the overlays show, on the client thread. */
-	private void updateOpenChest()
-	{
-		ChestPlan plan = openStorage == 0 ? null : chests.get(currentChest);
-		if (plan == null)
-		{
-			openChest = null;
-			return;
-		}
-		Map<String, Integer> items;
-		synchronized (lock)
-		{
-			items = inventoryItems;
-		}
-		ItemContainer storage = client.getItemContainer(openStorage == InterfaceID.RAIDS_STORAGE_SHARED
-			? InventoryID.RAIDS_SHAREDSTORAGE : InventoryID.RAIDS_PRIVATESTORAGE);
-		openChest = new ChestProgress(plan, items, openedWith, tally(storage));
-	}
-
-	/** Item name to quantity for a container, empty for one the client hasn't seen. */
-	private Map<String, Integer> tally(ItemContainer container)
-	{
-		if (container == null)
-		{
-			return Collections.emptyMap();
-		}
-		Map<String, Integer> items = new LinkedHashMap<>();
-		for (Item item : container.getItems())
-		{
-			if (item.getId() > 0)
-			{
-				items.merge(itemName(item.getId()), item.getQuantity(), Integer::sum);
-			}
-		}
-		return items;
-	}
-
-	/** Item name from the cache, filled on the client thread. */
-	String itemName(int itemId)
-	{
-		String name = itemNames.get(itemId);
-		if (name == null)
-		{
-			name = itemManager.getItemComposition(itemId).getName();
-			itemNames.put(itemId, name);
-		}
-		return name;
-	}
-
-	ChestProgress getOpenChest()
-	{
-		return config.chestOverlay() || config.chestGlow() ? openChest : null;
-	}
-
 	/** Region of the local player, the template's region inside an instance, -1 when not logged in. */
 	private int region()
 	{
@@ -816,43 +445,12 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		return WorldPoint.fromLocalInstance(client, player.getLocalLocation()).getRegionID();
 	}
 
-	/** Whether the numbers should be the solo ones right now. */
-	private boolean solo()
-	{
-		return inRaid ? soloRaid : needsTabSolo;
-	}
-
-	/** The solo doses for the solo tab, or a solo raid, when they are kept apart. */
-	private Needs needsFor(boolean solo)
-	{
-		return solo && config.separateSoloNeeds() ? needsSolo : needs;
-	}
-
-	private void remindAtOlm()
-	{
-		String shortfalls = snapshot().shortfalls();
-		if (!shortfalls.isEmpty())
-		{
-			chatMessageManager.queue(QueuedMessage.builder()
-				.type(ChatMessageType.CONSOLE)
-				.runeLiteFormattedMessage("Short for Olm: " + shortfalls)
-				.build());
-		}
-	}
-
 	private void leftRaid()
 	{
-		soloRaid = false;
-		atOlm = false;
 		privateItems.clear();
-		roomKeys.clear();
-		lastRoomSlot = null;
-		currentChest = null;
-		openChest = null;
+		storageOpen = false;
 		synchronized (lock)
 		{
-			privateStorage = null;
-			sharedStorage = null;
 			claims.clear();
 		}
 		if (plan.reset(true))
@@ -860,31 +458,6 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			savePlan();
 		}
 		loadoutDirty = true;
-	}
-
-	private static Supplies count(Item[] items)
-	{
-		int[] ids = new int[items.length];
-		int[] quantities = new int[items.length];
-		for (int i = 0; i < items.length; i++)
-		{
-			ids[i] = items[i].getId();
-			quantities[i] = items[i].getQuantity();
-		}
-		return Supplies.count(ids, quantities);
-	}
-
-	private static Supplies count(Map<Integer, Integer> items)
-	{
-		int[] ids = new int[items.size()];
-		int[] quantities = new int[items.size()];
-		int i = 0;
-		for (Map.Entry<Integer, Integer> e : items.entrySet())
-		{
-			ids[i] = e.getKey();
-			quantities[i++] = e.getValue();
-		}
-		return Supplies.count(ids, quantities);
 	}
 
 	private static void add(Loadout loadout, Item[] items)
@@ -900,12 +473,9 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		Loadout loadout = new Loadout().spellbook(client.getVarbitValue(VarbitID.SPELLBOOK));
 		ItemContainer carried = client.getItemContainer(InventoryID.INV);
 		ItemContainer worn = client.getItemContainer(InventoryID.WORN);
-		Supplies carriedSupplies = Supplies.EMPTY;
-		Map<String, Integer> items = tally(carried);
 		if (carried != null)
 		{
 			add(loadout, carried.getItems());
-			carriedSupplies = count(carried.getItems());
 		}
 		if (worn != null)
 		{
@@ -922,11 +492,8 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 
 		synchronized (lock)
 		{
-			inventory = carriedSupplies;
-			inventoryItems = items;
 			missing = missingFor(roles, loadout);
 		}
-		updateOpenChest();
 	}
 
 	private void addPouch(Loadout loadout)
@@ -1067,9 +634,7 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			{
 				claimed.add(claim.encode());
 			}
-			status = new CoxStatusMessage(Role.names(roles), describe(missing), claimed, inventory.toArray(),
-				privateStorage == null ? null : privateStorage.toArray(),
-				sharedStorage == null ? null : sharedStorage.toArray(), iron);
+			status = new CoxStatusMessage(Role.names(roles), describe(missing), claimed, iron);
 		}
 		if (resendStatus || !status.sameContent(lastSent))
 		{
@@ -1177,78 +742,6 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 	}
 
 	@Override
-	public void renameChest(String key, String name)
-	{
-		ChestPlan plan = chests.get(key);
-		if (plan != null && !plan.getName().equals(name.trim()))
-		{
-			plan.setName(name);
-			saveChests();
-			refresh();
-		}
-	}
-
-	@Override
-	public void setChestOrdered(String key, boolean ordered)
-	{
-		ChestPlan plan = chests.get(key);
-		if (plan != null && plan.isOrdered() != ordered)
-		{
-			plan.setOrdered(ordered);
-			saveChests();
-			clientThread.invokeLater(this::updateOpenChest);
-			refresh();
-		}
-	}
-
-	@Override
-	public void setChestLines(String key, boolean deposit, String text)
-	{
-		ChestPlan plan = chests.get(key);
-		if (plan == null)
-		{
-			return;
-		}
-		List<String> lines = ChestPlan.lines(text);
-		List<String> target = deposit ? plan.getDeposit() : plan.getWithdraw();
-		if (!target.equals(lines))
-		{
-			target.clear();
-			target.addAll(lines);
-			saveChests();
-			clientThread.invokeLater(this::updateOpenChest);
-			refresh();
-		}
-	}
-
-	@Override
-	public void setMarking(boolean on)
-	{
-		if (marking != on)
-		{
-			marking = on;
-			refresh();
-		}
-	}
-
-	@Override
-	public void selectChest(String key)
-	{
-		selectedChest = key;
-	}
-
-	@Override
-	public void deleteChest(String key)
-	{
-		if (chests.remove(key))
-		{
-			saveChests();
-			clientThread.invokeLater(this::updateOpenChest);
-			refresh();
-		}
-	}
-
-	@Override
 	public void finishRaid()
 	{
 		synchronized (lock)
@@ -1256,7 +749,6 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 			roles.clear();
 			claims.clear();
 		}
-		marking = false;
 		configManager.setConfiguration(CoxTeamUtilitiesConfig.GROUP, CoxTeamUtilitiesConfig.KEY_ROLES, "");
 		rolesChanged();
 	}
@@ -1274,29 +766,6 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 				recompute();
 				refresh();
 			});
-		}
-	}
-
-	@Override
-	public void setNeed(Potion potion, int doses)
-	{
-		Needs plan = needsFor(needsTabSolo);
-		if (plan.set(potion, doses))
-		{
-			configManager.setConfiguration(CoxTeamUtilitiesConfig.GROUP,
-				plan == needsSolo ? CoxTeamUtilitiesConfig.KEY_NEEDS_SOLO : CoxTeamUtilitiesConfig.KEY_NEEDS, plan.encode());
-			refresh();
-		}
-	}
-
-	@Override
-	public void setNeedsTab(boolean solo)
-	{
-		if (needsTabSolo != solo)
-		{
-			needsTabSolo = solo;
-			configManager.setConfiguration(CoxTeamUtilitiesConfig.GROUP, CoxTeamUtilitiesConfig.KEY_NEEDS_TAB_SOLO, solo);
-			refresh();
 		}
 	}
 
@@ -1439,41 +908,16 @@ public class CoxTeamUtilitiesPlugin extends Plugin implements CoxTeamPanel.Actio
 		PanelState state = new PanelState();
 		state.inParty = party.isInParty();
 		state.iron = iron;
-		state.countShared = config.countShared();
-		state.countSplit = config.countSplit();
-		state.units = config.needUnits();
-		state.chests = chests.copy(gson);
-		state.currentChest = currentChest;
-		state.marking = marking;
-		state.openChest = openChest;
-		synchronized (lock)
-		{
-			state.carriedItems = inventoryItems;
-		}
-		state.separateSoloNeeds = config.separateSoloNeeds();
-		state.trackStamina = config.trackStamina();
-		state.solo = solo();
-		Needs needs = needsFor(state.solo);
-		for (Potion potion : Potion.values())
-		{
-			state.need.put(potion, state.applies(potion) ? needs.get(potion) : 0);
-		}
 
 		PartyMember local = party.getLocalMember();
 		List<PartyMember> partyMembers = state.inParty ? party.getMembers() : Collections.emptyList();
 
 		synchronized (lock)
 		{
-			state.inventory = inventory;
-			state.privateStorage = privateStorage;
-			state.sharedStorage = sharedStorage;
 			state.roles.addAll(roles);
 			state.missing.putAll(missing);
 
-			MemberStatus mine = new MemberStatus(EnumSet.copyOf(state.roles), describe(missing),
-				claims.bySlot(), inventory, privateStorage, sharedStorage, iron);
-
-			state.claimed = claims.doses();
+			MemberStatus mine = new MemberStatus(EnumSet.copyOf(state.roles), describe(missing), claims.bySlot(), iron);
 
 			Map<Slot, PanelState.SlotView> shares = new HashMap<>();
 			for (Claim claim : claims.all())

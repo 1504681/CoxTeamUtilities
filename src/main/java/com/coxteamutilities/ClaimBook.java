@@ -132,15 +132,4 @@ final class ClaimBook
 	{
 		return new LinkedHashMap<>(claims);
 	}
-
-	/** Doses you've claimed, per potion. */
-	Supplies doses()
-	{
-		int[] doses = new int[Potion.values().length];
-		for (Claim claim : claims.values())
-		{
-			doses[claim.getSlot().getPotion().ordinal()] += claim.getDoses();
-		}
-		return Supplies.of(doses);
-	}
 }

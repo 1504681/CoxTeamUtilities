@@ -1,6 +1,6 @@
 # CoX Team Utilities
 
-RuneLite plugin for Chambers of Xeric Challenge Mode teams. A sidebar panel where you pick your roles, see what potions you have and still need, and claim the potions each room is going to drop. With the Party plugin everyone in the party sees the same thing.
+RuneLite plugin for Chambers of Xeric Challenge Mode teams. A sidebar panel where you pick your roles, get reminded of the items they need, and claim the potions each room is going to drop. With the Party plugin everyone in the party sees the same thing. Storage unit plans and the doses you need for Olm are in the separate [CoX Storage Planner](https://github.com/1504681/CoxStoragePlanner) plugin.
 
 ## Roles
 
@@ -17,18 +17,6 @@ Tick the roles you're doing. You can tick more than one.
 Items count from your inventory, worn equipment, private storage and rune pouch. Only the law and nature runes are checked for the spells, not the elemental runes.
 
 If something is missing the role turns red in the sidebar, an overlay lists it at the raid lobby and inside the raid until it starts, and a chat message (only you see it) repeats it when you enter. Overlay and chat message are for teams; a setting turns them on for solo raids too.
-
-## Supplies
-
-Overload, Xeric's aid, Revitalisation and Prayer enhance in your inventory and private storage (shared storage too if the setting is on), shown as doses or as potions (setting), against the `need` number you type next to each: what you want to have when you get to Olm. Short rows go red with how much more to pick up. Claims don't count until the potion is actually in your inventory.
-
-**Team** and **Solo** at the top switch between two sets of `need` numbers; with *Stamina in solo raids* on, Solo adds a Stamina row for the running at Olm. Both use the same numbers unless *Separate doses for solo raids* is on. Inside a raid the plugin picks team or solo from the raid's party size. Defaults: team 1 Overload, 6 Xeric's aid, 3 Revitalisation, 1 Prayer enhance; solo the same with 4 Revitalisation and 1 Stamina.
-
-When you walk into Olm you get a chat line with whatever you're still short.
-
-Under the rows a grid shows what each party member holds in inventory + private storage, the shared storage, and the total. `3?` is an inventory whose private storage hasn't been opened yet; `×` is a member without the plugin (the game doesn't show other players' inventories, so there's nothing to know).
-
-The game only sends a storage's contents while its interface is open, so both storages show `?` until someone has opened them in the current raid (a party member's view of the shared storage is used if you haven't opened it yourself). A deposit or withdrawal made as the interface closes doesn't come back from the game either, so the plugin works those out from what left or entered your inventory.
 
 ## Claims
 
@@ -57,38 +45,19 @@ A split overload is the elder, twisted and kodai that Vanguards drop, claimed as
 
 The wiki has no numbers for larger teams, so use `-` and `+` to set what your team size gets. Edited counts are kept between raids. The Vanguards overload count is random, so it goes back to 1 after each raid. Right click a room name to add a potion the table doesn't list. Claims are cleared when you leave the raid.
 
-## Chests
-
-Each storage unit in the raid gets its own plan: what to put in and what to take out. Open a storage unit and the chest appears under **Chests**, named after its room (`Ice Demon`, `Farming 1`, `Farming 2`, the two farming rooms are told apart by which comes first). Rename it, then fill the two lists: one item per line, matched from the start of the name so `Xeric's aid` is any dose, `*` and `?` as wildcards (`*chinchompa`, `Dragon *`), `Stinkhorn mushroom, 3` for a number, `everything` to empty the inventory. Numbers are quantities, so a stack of 14 juice counts as 14. A Put in line without a number means all of them; with one (`Endarkened*, 11`) the step is done once that many went in since you opened the storage, or the storage already holds that many.
-
-The easy way to fill the lists is to click: tick **Mark by clicking** and, with a storage open, left-clicking an item in the storage adds it to Take out and one in the side inventory to Put in (with no storage open, inventory items go to the chest picked in the sidebar). Every click adds one more, so three clicks on a stinkhorn make `Stinkhorn mushroom, 3`, and the order you click is the withdraw order. `Unmark` on the right-click menu takes one away. Marking is off again when you TYFR or restart the client.
-
-Tick **Withdraw in this order** and the list becomes steps 1, 2, 3. While the storage is open an overlay lists the steps and ticks them off as your inventory changes, and the items still to move glow: in the side inventory what goes in, in the storage what comes out. Ordered lists glow only the next item, or all of them in a gradient from the first colour to the last with their numbers (setting). Colours and the pulse are settings too.
-
 ## Party
 
-Join a party with the core Party plugin. Each member with this plugin shows up under Team with their roles and missing items, and in the Supplies grid with their doses. Claims, drop count edits and the shared storage contents are shared.
+Join a party with the core Party plugin. Each member with this plugin shows up under Team with their roles and missing items. Claims and drop count edits are shared.
 
 ## Settings
 
 | Setting | Default |
 |---|---|
-| Show supplies as | doses |
-| Separate doses for solo raids | off |
-| Stamina in solo raids | off |
-| Count shared storage towards what you need | off |
-| Count split overloads as overload doses | on |
 | Missing item overlay | on |
 | Keep overlay during the raid | off |
 | Include party members in reminders | on |
 | Chat message on entry | on |
-| Olm entry reminder | on |
 | Role reminders in solo raids | off |
-| Chest steps overlay | off |
-| Glow items | on |
-| Ordered withdraw glow | only the next one |
-| Glow colour / gradient end colour | cyan / pink |
-| Pulse | on |
 | Notify on entry | off |
 
 ## TYFR
